@@ -228,7 +228,12 @@ static void FOSPresentDrawable(id commandBuffer, SEL cmd, id drawable) {
         return;
     }
     fosPresentingCapped = YES;
+#if TARGET_OS_SIMULATOR
+    // The simulator's MTLCommandBuffer protocol omits afterMinimumDuration; launcher testing doesn't need a GPU cap.
+    fosPresentDrawable(commandBuffer, cmd, drawable);
+#else
     [(id<MTLCommandBuffer>)commandBuffer presentDrawable:drawable afterMinimumDuration:1.0 / (CFTimeInterval)cap];
+#endif
     fosPresentingCapped = NO;
 }
 

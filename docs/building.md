@@ -30,6 +30,8 @@ FACTORIOS_DMG = "/path/to/factorio_mac.dmg"
 | `mise run format` | rewrites Swift sources with swift-format | anywhere |
 | `mise run inspect` | analyzes the configured Factorio build, installing its Python dependencies first | Linux, WSL or macOS |
 | `mise run xcode-project` | generates `xtool/FactoriOS.xcworkspace` for Xcode-managed signing and installation | macOS with Xcode |
+| `mise run build-simulator` | writes a simulator app to the configured DerivedData directory | macOS with Xcode |
+| `mise run simulator` | builds, installs and launches the app in the configured iOS Simulator | macOS with Xcode |
 | `mise run dev` | builds, signs and installs directly through xtool | an xtool development machine |
 
 `check` sets `FACTORIOS_CORE_ONLY` for its host build, which hides the iOS-only targets. `check-ios` needs Xcode's iOS
@@ -41,7 +43,7 @@ SDK because clang-tidy and the cross-compile resolve UIKit, Metal and the Object
 
 - Ubuntu installs the pinned mise toolchain and runs `mise run check`.
 - macOS runs `mise run check-ios`, which obtains SDL3, analyzes Objective-C against the iOS SDK and compiles
-  `FactoriOSApp` for `arm64-apple-ios17.0`.
+  `FactoriOSApp` for both `arm64-apple-ios17.0` and `arm64-apple-ios17.0-simulator`.
 
 Actions are pinned by commit SHA, workflow permissions are read-only, duplicate runs are cancelled, and both jobs
 have timeouts. Binary feasibility inspection is not a CI step because the proprietary Factorio disk image is
@@ -70,6 +72,10 @@ Linux and WSL developers can instead use `mise run dev` after completing
 [xtool's setup](https://xtool.sh/documentation/xtool/installation-linux), but must obtain the exact identity xtool used
 for signing; the Xcode workflow is the supported macOS path because its identity is exportable through Keychain
 Access.
+
+For a launcher-only smoke test, set `FACTORIOS_SIMULATOR_ID` and optionally `FACTORIOS_DERIVED_DATA` in the ignored
+`mise.local.toml`, then run `mise run simulator`. The imported game is device code and its signing and loading gates
+still require a physical iPhone or iPad; simulator success does not establish that Factorio runs.
 
 `xtool.yml` names the bundle (`app.factorios`), `Resources/Info.plist` adds landscape, Files app sharing and game
 controller keys, and the default `Resources/FactoriOS.entitlements` is empty so an Apple Account's Personal Team can

@@ -70,7 +70,7 @@ run = "python3 scripts/check-architecture"
 
 [tasks.check-repo]
 hide = true
-description = "Checks workflows, scripts and entitlement property lists"
+description = "Checks workflows, scripts and property lists"
 run = """
 jactionlint
 shellcheck scripts/prepare-sdl3.sh
@@ -80,6 +80,7 @@ import pathlib
 import plistlib
 
 for path in (
+    pathlib.Path("Resources/Info.plist"),
     pathlib.Path("Resources/FactoriOS.entitlements"),
     pathlib.Path("Resources/FactoriOS.memory.entitlements"),
 ):
@@ -108,9 +109,20 @@ swift build \
   --target FactoriOSApp
 """
 
+[tasks.build-ios-simulator]
+hide = true
+description = "Compiles every iOS target for the simulator"
+depends = ["prepare-sdl3"]
+run = """
+swift build \
+  --triple arm64-apple-ios17.0-simulator \
+  --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+  --target FactoriOSApp
+"""
+
 [tasks.check-ios]
-description = "Prepares SDL, analyzes Objective-C and compiles every iOS target"
-depends = ["tidy", "build-ios"]
+description = "Analyzes Objective-C and compiles every target for devices and the simulator"
+depends = ["tidy", "build-ios", "build-ios-simulator"]
 
 [tasks.dev]
 description = "Prepares SDL, then builds and installs with xtool"
@@ -121,3 +133,29 @@ run = "xtool dev"
 description = "Prepares SDL, then generates the Xcode workspace"
 depends = ["prepare-sdl3"]
 run = "xtool dev generate-xcode-project"
+
+[tasks.build-simulator]
+description = "Builds the generated app for the configured iOS Simulator"
+depends = ["xcode-project"]
+run = """
+xcodebuild \
+  -workspace xtool/FactoriOS.xcworkspace \
+  -scheme FactoriOS-App \
+  -configuration Debug \
+  -destination "platform=iOS Simulator,id=${FACTORIOS_SIMULATOR_ID:?set FACTORIOS_SIMULATOR_ID in mise.local.toml}" \
+  -derivedDataPath "${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}" \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+"""
+
+[tasks.simulator]
+description = "Builds, installs and launches the app in the configured iOS Simulator"
+depends = ["build-simulator"]
+run = """
+simulator_id="${FACTORIOS_SIMULATOR_ID:?set FACTORIOS_SIMULATOR_ID in mise.local.toml}"
+derived_data="${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}"
+xcrun simctl boot "$simulator_id" 2>/dev/null || true
+xcrun simctl bootstatus "$simulator_id" -b
+xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/FactoriOS-App.app"
+xcrun simctl launch "$simulator_id" app.factorios
+"""

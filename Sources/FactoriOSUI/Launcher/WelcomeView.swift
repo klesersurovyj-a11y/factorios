@@ -45,8 +45,8 @@ struct WelcomeView: View {
             Text(
                 """
                 iOS only runs code signed for this device. Import a .p12 containing the exact Apple Development \
-                identity xtool used to install FactoriOS; a different certificate will not work. FactoriOS signs the \
-                game with that identity.
+                identity used to install FactoriOS; a different certificate will not work. FactoriOS signs the game \
+                with that identity.
                 """
             )
             .font(.callout)
