@@ -111,11 +111,20 @@ static NSError *FOSSDLMakeError(NSInteger code, NSString *message) {
     return [NSError errorWithDomain:FOSSDLErrorDomain code:code userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
+/// Converts a nullable C string without allowing invalid UTF-8 to escape as a nullable NSString.
+static NSString *FOSStringFromUTF8(const char *_Nullable bytes) {
+    if (bytes == NULL) {
+        return @"";
+    }
+    NSString *string = [NSString stringWithUTF8String:bytes];
+    return string != nil ? string : @"";
+}
+
 /// Resolves one SDL function, noting its name when the library lacks it.
 static void *_Nullable FOSSDLSymbol(void *handle, const char *name, NSMutableArray<NSString *> *missing) {
     void *symbol = dlsym(handle, name);
     if (symbol == NULL) {
-        [missing addObject:[NSString stringWithUTF8String:name]];
+        [missing addObject:FOSStringFromUTF8(name)];
     }
     return symbol;
 }
@@ -163,8 +172,7 @@ BOOL FOSSDLLoad(NSString *path, NSError *_Nullable *_Nullable error) {
         const char *reason = dlerror();
         if (error != NULL) {
             NSString *message =
-                reason != NULL ? [NSString stringWithUTF8String:reason]
-                               : [NSString stringWithFormat:@"Can't open %@", path];
+                reason != NULL ? FOSStringFromUTF8(reason) : [NSString stringWithFormat:@"Can't open %@", path];
             *error = FOSSDLMakeError(1, message);
         }
         return NO;
@@ -196,7 +204,7 @@ BOOL FOSSDLSetHint(NSString *name, NSString *value) {
 
 NSString *FOSSDLLastError(void) {
     const char *message = fosSDL.GetError();
-    return message != NULL ? [NSString stringWithUTF8String:message] : @"";
+    return FOSStringFromUTF8(message);
 }
 
 /// SDL_VirtualJoystickDesc.Rumble: forwards SDL's 16-bit strengths to the handler as 0...1.

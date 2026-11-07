@@ -150,7 +150,10 @@ static void FOSLayerSetDisplaySyncEnabled(id layer, SEL cmd, BOOL enabled) {
 static BOOL FOSLayerDisplaySyncEnabled(id layer, SEL cmd) {
     (void)cmd;
     NSNumber *enabled = objc_getAssociatedObject(layer, &FOSDisplaySyncKey);
-    return enabled == nil ? YES : (BOOL)enabled.boolValue;
+    if (enabled == nil) {
+        return YES;
+    }
+    return enabled.boolValue;
 }
 
 #pragma mark - Storage-mode swizzles
