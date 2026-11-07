@@ -106,7 +106,7 @@ static void FOSAddMethod(Class cls, const char *name, IMP implementation, const 
 static MTLResourceOptions FOSSharedOptions(MTLResourceOptions options) {
     MTLResourceOptions mask = (MTLResourceOptions)MTLResourceStorageModeMask;
     if (((options & mask) >> MTLResourceStorageModeShift) == FOSStorageModeManaged) {
-        return (options & ~mask) | MTLResourceStorageModeShared;
+        return (MTLResourceOptions)((options & ~mask) | MTLResourceStorageModeShared);
     }
     return options;
 }
