@@ -159,3 +159,30 @@ xcrun simctl bootstatus "$simulator_id" -b
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/FactoriOS-App.app"
 xcrun simctl launch "$simulator_id" app.factorios
 """
+
+[tasks.build-device]
+description = "Builds and signs the app for the configured iPhone or iPad with Xcode automatic signing"
+depends = ["xcode-project"]
+run = """
+xcodebuild \
+  -workspace xtool/FactoriOS.xcworkspace \
+  -scheme FactoriOS-App \
+  -configuration Debug \
+  -destination "id=${FACTORIOS_DEVICE_ID:?set FACTORIOS_DEVICE_ID in mise.local.toml}" \
+  -derivedDataPath "${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}" \
+  -allowProvisioningUpdates \
+  -allowProvisioningDeviceRegistration \
+  DEVELOPMENT_TEAM="${FACTORIOS_TEAM_ID:?set FACTORIOS_TEAM_ID in mise.local.toml}" \
+  CODE_SIGN_STYLE=Automatic \
+  build
+"""
+
+[tasks.device]
+description = "Builds, installs and launches the app on the configured iPhone or iPad"
+depends = ["build-device"]
+run = """
+device_id="${FACTORIOS_DEVICE_ID:?set FACTORIOS_DEVICE_ID in mise.local.toml}"
+derived_data="${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}"
+xcrun devicectl device install app --device "$device_id" "$derived_data/Build/Products/Debug-iphoneos/FactoriOS-App.app"
+xcrun devicectl device process launch --device "$device_id" --terminate-existing app.factorios
+"""
