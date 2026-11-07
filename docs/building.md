@@ -82,6 +82,49 @@ packager is xtool; this repository does not yet provide an Xcode app project or 
 3. Import that `.p12` in FactoriOS. The converted game is separate executable code, so it must carry a valid embedded
    signature from the host's identity before iOS can load it.
 
+### Device validation
+
+The source and iOS targets compile in CI, but no device run has happened. Do not report the demo as playable until
+this procedure passes. The four decisive runtime gates and the full verification matrix remain in
+[`feasibility.md`](feasibility.md#gates-only-a-device-can-close) and
+[`architecture.md`](architecture.md#deferred-verified-only-on-a-device).
+
+#### Prerequisites
+
+- A green CI run for the commit under test.
+- An arm64 iPhone or iPad on iOS 17 or later, registered with the signing account and visible to xtool.
+- xtool configured with an iOS SDK, the pinned SDL3 framework built by `mise run sdl3`, and the demo `.dmg`.
+- The exact Apple Development identity and private key used by `xtool dev`, exported as a password-protected `.p12`.
+  This export is still unresolved in stable xtool. Stop here until a reproducible export method exists; a different
+  identity cannot establish whether library validation works.
+
+Record the commit, Factorio version, device model, iOS version, signing-team type and entitlement file before testing.
+
+#### Procedure
+
+1. Run `xtool dev`. Pass when installation succeeds and the launcher opens without terminating.
+2. Import the matching `.p12`. Pass when FactoriOS accepts its password and reports that the signing identity is
+   available.
+3. Import the demo `.dmg`. Record the duration and final installation stage. Pass when extraction, conversion and
+   signing reach Ready, and the Factorio folder is visible through the Files app.
+4. Start **Main menu**. Pass the sign/load gate when the converted library passes validation, `dlopen` succeeds and
+   Factorio reaches its main function. Preserve both FactoriOS and game logs even on success.
+5. Reach the Factorio menu and start a new demo game. Pass the SDL and Metal gates when the window renders correctly,
+   audio plays and the session remains responsive without shader, dynamic-API or compatibility errors.
+6. Exercise touch mouse gestures, every on-screen control, keyboard input, haptics where supported and a physical
+   controller where available. Background and foreground the app, then verify rendering resumes and the configured
+   frame-rate cap still applies.
+7. Save, exit, relaunch and use **Continue**. Import and export a save, open the Factorio folder and copy both logs.
+   Exercise a game action that requests restart when one is available; pass when FactoriOS asks the player to reopen
+   it rather than attempting `execv`.
+8. Run a new demo game for at least 15 minutes. Record memory-pressure or jetsam diagnostics, sustained responsiveness
+   and the FPS display. Pass the resource gate when the session remains alive and usable on the recorded device.
+
+For every failure, retain the two application logs, the visible error and relevant device diagnostics before
+reinstalling. A screenshot or short recording should accompany rendering, input or lifecycle results. The demo is
+**playable on the tested device** only after steps 1–6 and the resource gate in step 8 pass; the implementation is
+device-verified only after every applicable row in the architecture verification matrix has evidence.
+
 Apple's [developer account documentation](https://developer.apple.com/help/account/basics/about-your-developer-account/)
 states the free Personal Team limits: App IDs, registered devices, and provisioning profiles expire after seven days;
 the app must then be rebuilt and reinstalled. A free account allows up to three devices and three installed apps per

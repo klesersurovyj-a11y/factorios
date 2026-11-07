@@ -5,8 +5,8 @@ factorio.com, turns it into a library iOS can load, signs it with the same Apple
 FactoriOS, and runs it natively. SDL3 for iOS and a small compatibility layer replace the few Mac-only APIs the game
 uses. No emulation, no streaming, and none of the game's files in the app.
 
-**Status: written, not yet run.** Nothing here has run on a device. `docs/architecture.md` lists exactly what remains
-to be verified there.
+**Status: written and compiled for iOS in CI, not yet run on a device.** Compilation proves no runtime behaviour.
+`docs/building.md` defines the device-validation procedure; `docs/architecture.md` lists every deferred result.
 
 ## How it works
 
