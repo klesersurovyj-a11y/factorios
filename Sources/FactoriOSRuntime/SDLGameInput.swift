@@ -16,10 +16,13 @@ final class SDLGameInput: GameInput {
 
     /// Attaches the virtual gamepad; `haptics` plays the game's rumble, or nil for none.
     init(haptics: RumbleHaptics?) throws {
-        let rumble: (@Sendable (Float, Float) -> Void)? = haptics.map { player in
-            { low, high in
-                Task { @MainActor in player.rumble(low: low, high: high) }
+        let rumble: (@Sendable (Float, Float) -> Void)?
+        if let haptics {
+            rumble = { low, high in
+                Task { @MainActor in haptics.rumble(low: low, high: high) }
             }
+        } else {
+            rumble = nil
         }
         var error: NSError?
         guard FOSSDLAttachVirtualGamepad(Self.gamepadName, rumble, &error) else {
