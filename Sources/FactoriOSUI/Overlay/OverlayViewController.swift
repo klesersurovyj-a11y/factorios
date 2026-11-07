@@ -1,4 +1,5 @@
 import FactoriOSCore
+import FactoriOSRuntime
 import GameController
 import UIKit
 
@@ -9,15 +10,20 @@ import UIKit
 final class OverlayViewController: UIViewController {
     private let input: (any GameInput)?
     private let vibration: Bool
+    private let showFPS: Bool
     private let layoutFile: URL?
     private let onFinishEditing: (() -> Void)?
     private let padView: PadView
     private let toolbar = PadToolbar()
     private let gameView: GameTouchView?
     private let hint = UILabel()
+    private let fpsLabel = UILabel()
     private let tickFeedback = UISelectionFeedbackGenerator()
     private let clickFeedback = UIImpactFeedbackGenerator(style: .light)
     private var keyboardShown = false
+    private var frameLink: CADisplayLink?
+    private var sampleTime: CFTimeInterval = 0
+    private var sampleFrames: UInt64 = 0
 
     /// A physical controller is connected: the on-screen controls step aside.
     private var padInHand = false {
@@ -36,6 +42,7 @@ final class OverlayViewController: UIViewController {
     ) {
         self.input = input
         vibration = settings.vibration
+        showFPS = settings.fpsCounter
         self.layoutFile = layoutFile
         self.onFinishEditing = onFinishEditing
         let layout = layoutFile.map { PadLayout.load(from: $0) } ?? .default
@@ -65,6 +72,9 @@ final class OverlayViewController: UIViewController {
         if let gameView {
             view.addSubview(gameView)
         }
+        if showFPS {
+            configureFPSCounter()
+        }
         view.addSubview(padView)
         if input == nil {
             hint.text = "Drag a control to move it, pinch it to resize it. Tap one, then use the tools above."
@@ -90,7 +100,40 @@ final class OverlayViewController: UIViewController {
         padView.frame = view.bounds
         toolbar.frame = view.bounds
         hint.frame = view.bounds.insetBy(dx: 40, dy: 0).divided(atDistance: 60, from: .maxYEdge).slice
+        fpsLabel.frame = CGRect(
+            x: view.safeAreaInsets.left + 12, y: view.safeAreaInsets.top + 8, width: 112, height: 30)
         refresh()
+    }
+
+    private func configureFPSCounter() {
+        fpsLabel.font = .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+        fpsLabel.textColor = .white
+        fpsLabel.backgroundColor = UIColor.black.withAlphaComponent(0.65)
+        fpsLabel.textAlignment = .center
+        fpsLabel.layer.cornerRadius = 6
+        fpsLabel.clipsToBounds = true
+        fpsLabel.isUserInteractionEnabled = false
+        fpsLabel.text = "— FPS"
+        view.addSubview(fpsLabel)
+        sampleTime = CACurrentMediaTime()
+        sampleFrames = PresentedFrames.current
+        let link = CADisplayLink(target: self, selector: #selector(sampleFPS))
+        link.add(to: .main, forMode: .common)
+        frameLink = link
+    }
+
+    @objc
+    private func sampleFPS(_ link: CADisplayLink) {
+        let elapsed = link.timestamp - sampleTime
+        guard elapsed >= 0.5 else {
+            // A shorter sample flickers too much to be useful.
+            return
+        }
+        let frames = PresentedFrames.current
+        let count = frames >= sampleFrames ? frames - sampleFrames : 0
+        fpsLabel.text = "\(Int((Double(count) / elapsed).rounded())) FPS"
+        sampleTime = link.timestamp
+        sampleFrames = frames
     }
 
     /// Redraws the controls and puts up the tools for the current state.

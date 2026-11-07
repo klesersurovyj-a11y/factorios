@@ -28,8 +28,8 @@ flowchart LR
 
 ## Requirements
 
-- An iPhone or iPad with an A14 chip or later on iOS 17 or later, sideloaded with SideStore, AltStore or xtool and a
-  free Apple ID.
+- An arm64 iPhone or iPad on iOS 17 or later, sideloaded with SideStore, AltStore or xtool and a free Apple ID.
+  Which device generations can run the game within their CPU and memory limits remains a device-test gate.
 - Factorio for macOS from [factorio.com/download](https://factorio.com/download) (the demo works too).
 - The sideloading tool's signing certificate, exported as a `.p12` file, which FactoriOS uses to sign the converted
   game on the device.

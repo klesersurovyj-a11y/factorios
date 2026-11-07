@@ -12,6 +12,15 @@ enum LibraryLinking {
         "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
     ]
 
+    /// Mac frameworks whose used symbols live in an iOS system library.
+    ///
+    /// The command remains weak so unrelated framework symbols may stay absent. CoreServices supplies `nan` to the
+    /// demo's initializers; libSystem exports it on iOS, letting dyld resolve that call before the post-dlopen
+    /// compatibility slots can be filled.
+    static let weakRedirects = [
+        "/System/Library/Frameworks/CoreServices.framework/CoreServices": "/usr/lib/libSystem.B.dylib"
+    ]
+
     /// Rewrites macOS's versioned bundle layout `…/X.framework/Versions/<V>/X` to iOS's flat `…/X.framework/X`.
     ///
     /// Paths of any other form are returned unchanged.
@@ -30,9 +39,17 @@ enum LibraryLinking {
         return components.joined(separator: "/")
     }
 
+    static func convertedPath(_ path: String) -> String {
+        let flattened = flattenedPath(path)
+        return weakRedirects[flattened] ?? flattened
+    }
+
     /// The load command type a library gets in the iOS image, given its already flattened path.
     static func commandType(for library: LinkedLibrary, flattenedPath: String) -> UInt32 {
-        requiredLibraries.contains(flattenedPath) ? library.type : LoadCommandType.loadWeakDylib
+        if weakRedirects[flattenedPath] != nil {
+            return LoadCommandType.loadWeakDylib
+        }
+        return requiredLibraries.contains(flattenedPath) ? library.type : LoadCommandType.loadWeakDylib
     }
 }
 
@@ -49,7 +66,8 @@ struct ConvertedLibrary {
 
     init(_ library: LinkedLibrary) {
         original = library
-        path = LibraryLinking.flattenedPath(library.path)
-        type = LibraryLinking.commandType(for: library, flattenedPath: path)
+        let flattened = LibraryLinking.flattenedPath(library.path)
+        path = LibraryLinking.convertedPath(library.path)
+        type = LibraryLinking.commandType(for: library, flattenedPath: flattened)
     }
 }

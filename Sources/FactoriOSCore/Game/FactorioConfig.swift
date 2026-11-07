@@ -13,7 +13,7 @@ public enum FactorioConfig {
 
     /// Returns `ini` with FactoriOS's keys set: paths, input method, UI scale, sprite quality and effects.
     ///
-    /// The FPS counter isn't a `config.ini` key: the runtime turns on Metal's performance HUD instead.
+    /// The FPS counter is an app overlay fed by the runtime's Metal presentation hook, not a `config.ini` key.
     ///
     /// - Parameters:
     ///   - ini: The current `config.ini` text, empty when there is none yet.

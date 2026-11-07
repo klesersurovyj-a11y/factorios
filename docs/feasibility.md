@@ -121,14 +121,20 @@ the compatibility slots. So none of that code may reach a Mac-only or replaced i
 ```
 __objc_nlclslist (+load): 0 entries
 __objc_nlcatlist (+load): 0 entries
-__mod_init_func: 448 initializers; imports reached three calls deep: 73
-  from Mac-only libraries or replaced by FactoriOS: none
-  other libraries reached: CoreGraphics, Foundation, Metal, QuartzCore
+__mod_init_func: 448 initializers; 3594 functions reached to fixed point; 102 imports
+  replaced symbols reached before slot patching: none
+  pre-load library redirects: _nan → libSystem.B.dylib
+  unhandled Mac-only symbols reached: none
+  other libraries reached: CoreGraphics, CoreServices, Foundation, Metal, QuartzCore
 ```
 
-What they do reach from those four libraries are constants iOS has (`kCGColorSpaceSRGB`, `kCAFilter*`, the
-`MTLCommonCounter*` names, Foundation's error keys), so filling the slots right after `dlopen` and before the entry
-point is early enough. The report is part of `scripts/inspect-binary`, to be checked again on every new game version.
+The analyzer follows every statically resolvable direct call to a fixed point, rather than stopping at an arbitrary
+depth, and checks the actual 16-symbol replacement table. CoreServices' `_nan` is reached during loading, so the
+converter redirects that weak library ordinal to iOS's libSystem before dyld runs initializers. Calls hidden behind
+function pointers remain a device-test risk. The other reached imports are constants and APIs present on iOS
+(`kCGColorSpaceSRGB`, `kCAFilter*`, `MTLCommonCounter*`, Foundation error keys). This evidence supports—without
+proving on-device—that filling the remaining slots after `dlopen` is early enough. Re-run `scripts/inspect-binary`
+for every game version.
 
 ## Metal on iOS
 
@@ -176,8 +182,10 @@ on; it shows the launcher, and when the player starts a game it calls the game's
 
 ## LiveContainer's precedent
 
-LiveContainer runs unmodified iOS apps inside one sideloaded app. Its `LiveContainer/LCMachOUtils.m` (main branch,
-read 2026-11-07) turns an executable into a library the same way FactoriOS has to:
+LiveContainer runs unmodified iOS apps inside one sideloaded app. Its
+[`LCMachOUtils.m`](https://github.com/LiveContainer/LiveContainer/blob/9108ae624ea001f7d7696d48407f890b48fa2653/LiveContainer/LCMachOUtils.m)
+at revision `9108ae624ea001f7d7696d48407f890b48fa2653` turns an executable into a library the same way
+FactoriOS has to:
 
 ```
 header->filetype = MH_DYLIB;
@@ -195,6 +203,10 @@ FactoriOS uses: no JIT, every converted library signed on the device with the si
 guests are iOS binaries; FactoriOS's is a macOS binary retagged for iOS (`LC_BUILD_VERSION`), which dyld otherwise
 refuses to load into an iOS process **[inference]**.
 
+LiveContainer is AGPL-3.0. FactoriOS uses it only as a cited behavioral precedent; the converter and signer here are
+independent implementations from Mach-O and code-signing formats, with no LiveContainer or ZSign source copied.
+FactoriOS itself has no granted license yet; choose and add one before distributing source or binaries.
+
 ## Gates only a device can close
 
 1. **Sign and load.** A 226 MB library converted and signed on the device with a free Apple ID's certificate passes
@@ -203,9 +215,10 @@ refuses to load into an iOS process **[inference]**.
    layer, touch and audio work when the game's entry point runs inside SDL's `postFinishLaunch`.
 3. **Metal.** The 110 shaders compile on iOS's Metal compiler, and the game renders with managed storage turned into
    shared storage and without BC textures where the GPU lacks them.
-4. **Memory and CPU.** The demo fits in the device's per-app memory limit (about 3 GB expected; the
-   increased-memory-limit entitlement is requested where the signing team allows it), and the arm64 slice, built for
-   Apple silicon Macs, runs on the device's CPU (A14 or later expected) **[inference]**.
+4. **Memory and CPU.** The demo fits in the device's per-app memory limit with the default free-team profile. If it
+   does not, the optional increased-memory/extended-addressing profile works with the signing team that grants those
+   capabilities. The arm64 macOS slice also executes correctly on the chosen iOS device; no minimum chip generation
+   is inferred from the Mach-O architecture alone.
 
 iOS forbids GPU work in the background; the compatibility layer holds the game's next frame until the app is back in
 the foreground.

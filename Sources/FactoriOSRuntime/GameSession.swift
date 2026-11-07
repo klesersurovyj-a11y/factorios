@@ -88,13 +88,6 @@ final class GameSession {
         setenv("SDL3_DYNAMIC_API", AppEntry.sdlLibrary.path, 1)
         // The container: Factorio finds nothing of its own there; config.ini points it at its data.
         setenv("HOME", NSHomeDirectory(), 1)
-        // Apple's Metal Performance HUD stands in for an FPS counter. It must be set before the game's Metal device
-        // exists, which is before the compatibility layer's probe device below.
-        if settings.fpsCounter {
-            setenv("MTL_HUD_ENABLED", "1", 1)
-        } else {
-            unsetenv("MTL_HUD_ENABLED")
-        }
         // Detailed logs: Metal's validation layer, which also has to be on before the game's device exists.
         if settings.detailedLogs {
             setenv("MTL_DEBUG_LAYER", "1", 1)

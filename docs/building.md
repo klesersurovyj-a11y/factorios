@@ -40,16 +40,21 @@ can compile the core.
 
 ## The app
 
-1. **SDL3 for iOS**, once (macOS with Xcode and CMake): `mise run sdl3` builds `Vendor/SDL3.xcframework`.
-   `Package.swift` requires it; xtool embeds it in `FactoriOS.app/Frameworks`.
+1. **SDL3 for iOS**, once (macOS with Xcode and CMake): `mise run sdl3` builds `Vendor/SDL3.xcframework`
+   from SDL 3.4.20 at pinned commit `f00dc919ca35b9756316e86c4777392de442f9b2`. `Package.swift` requires it;
+   xtool embeds it in `FactoriOS.app/Frameworks`. SDL's
+   [dynamic API contract](https://wiki.libsdl.org/SDL3/README-dynapi) keeps the table order stable, appends new
+   entries, and rejects a caller whose table is larger or whose table version differs. That rejection remains part of
+   the SDL device gate.
 2. **xtool:** install it and its iOS SDK by following
    [xtool's guide](https://xtool.sh/documentation/xtool/installation-linux) (`xtool setup`; on macOS Xcode provides the
    SDK).
 3. **Build and install:** `xtool dev` with an iPhone or iPad connected (on WSL, pass USB through with `usbipd`).
 
 `xtool.yml` names the bundle (`app.factorios`), `Resources/Info.plist` adds landscape, Files app sharing and game
-controller keys, and `Resources/FactoriOS.entitlements` asks for the increased memory limit and extended virtual
-addressing. Apple grants those entitlements per team; xtool reports any the signing team can't have.
+controller keys, and the default `Resources/FactoriOS.entitlements` is empty so a free Apple ID can provision it.
+If device testing proves the normal memory allowance insufficient and the signing team has the capabilities, point
+`entitlementsPath` at `Resources/FactoriOS.memory.entitlements` to request increased memory and extended addressing.
 
 `scripts/make-icon` redraws `Resources/AppIcon.png`.
 

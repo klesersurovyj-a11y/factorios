@@ -63,8 +63,9 @@ UDIF disk images with bzip2, zlib, raw and zero chunks; HFS+ and HFSX volumes wi
 ### FactoriOSCore: Mach-O conversion
 
 The game's arm64 slice becomes an iOS library: platform retagged, `MH_DYLIB` with `LC_ID_DYLIB`, one-page
-`__PAGEZERO`, flat framework paths, Mac-only frameworks weak, their binds weak-import, old signature removed, and the
-pointer slots of every replaced symbol recorded.
+`__PAGEZERO`, flat framework paths, Mac-only frameworks weak, CoreServices' load-time `_nan` binding redirected to
+libSystem, their other binds weak-import, old signature removed, and the pointer slots of every replaced symbol
+recorded.
 
 - `Sources/FactoriOSCore/MachO/GameConverter.swift`: `GameConverter`, `GameConverter.convert`
 - `Sources/FactoriOSCore/MachO/ConversionOptions.swift`: `ConversionOptions`, `MachOVersion`, `SymbolSlotManifest`, `ConvertedImage`
@@ -125,22 +126,24 @@ the UI only draws them and feeds them touches.
 - `Sources/FactoriOSRuntime/RumbleHaptics.swift`: `RumbleHaptics`
 - `Sources/FactoriOSRuntime/RuntimeWindows.swift`: `RuntimeWindows`, `PassthroughWindow`, `RestartPrompt`
 - `Sources/FactoriOSRuntime/RuntimeLog.swift`: `RuntimeLog`
+- `Sources/FactoriOSRuntime/PresentedFrames.swift`: `PresentedFrames`, `PresentedFrames.current`
 
 Install: import (detached task) → `GameConverter.convert` with the compat table's symbols → `MachOSigner.sign` with the
-`.p12` identity from the keychain. Launch: `config.ini`; environment (`SDL3_DYNAMIC_API`, `MTL_HUD_ENABLED` for the FPS
-counter, `MTL_DEBUG_LAYER` and `SDL_LOGGING` for detailed logs); stdout and stderr to `Logs/game.log`; Metal fixes;
-`dlopen`; slots filled through `vm_protect`; the overlay window above SDL's window (found through SDL's
-`SDL.window.uikit.window` property, inset by the Frame setting); then the game's `LC_MAIN` entry.
+`.p12` identity from the keychain. Launch: `config.ini`; environment (`SDL3_DYNAMIC_API`, plus `MTL_DEBUG_LAYER` and
+`SDL_LOGGING` for detailed logs); stdout and stderr to `Logs/game.log`; Metal fixes; `dlopen`; slots filled through
+`vm_protect`; the overlay window above SDL's window (found through SDL's `SDL.window.uikit.window` property, inset by
+the Frame setting); then the game's `LC_MAIN` entry. The FPS overlay samples the presentation hook's monotonic frame
+count; it does not depend on Apple's developer-only Metal HUD.
 
 ### FactoriOSCompat
 
-- `Sources/FactoriOSCompat/include/FactoriOSCompat.h`: `FOSSymbolReplacement`, `FOSCompatReplacements`, `FOSCompatWriteSlot`, `FOSCompatInstallMetalFixes`, `FOSCompatSetExecutablePath`, `FOSCompatSetRestartHandler`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatSetWindowFrame`
+- `Sources/FactoriOSCompat/include/FactoriOSCompat.h`: `FOSSymbolReplacement`, `FOSCompatReplacements`, `FOSCompatWriteSlot`, `FOSCompatInstallMetalFixes`, `FOSCompatSetExecutablePath`, `FOSCompatSetRestartHandler`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatPresentedFrameCount`, `FOSCompatSetWindowFrame`
 - `Sources/FactoriOSCompat/include/FOSSDL.h`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLSetMainReady`, `FOSSDLSetHint`, `FOSSDLAttachVirtualGamepad`, `FOSSDLSetGamepadButton`, `FOSSDLSetGamepadAxis`, `FOSSDLWarpMouse`, `FOSSDLScrollWheel`, `FOSSDLSetTextInputActive`, `FOSSDLGameWindow`
 - `Sources/FactoriOSCompat/FOSAppKit.h`: `FOSColorSpace`, `FOSBitmapImageRep`, `FOSWorkspace`
 - `Sources/FactoriOSCompat/FOSImageRep.m`: `FOSColorSpace`, `FOSBitmapImageRep`
 - `Sources/FactoriOSCompat/FOSWorkspace.m`: `FOSWorkspace`
 - `Sources/FactoriOSCompat/FOSReplacements.m`: `FOSCompatReplacements`, `fos_execv`, `fos_fork`, `fos_NSGetExecutablePath`
-- `Sources/FactoriOSCompat/FOSMetalFixes.m`: `FOSCompatInstallMetalFixes`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`
+- `Sources/FactoriOSCompat/FOSMetalFixes.m`: `FOSCompatInstallMetalFixes`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatPresentedFrameCount`
 - `Sources/FactoriOSCompat/FOSSDL.m`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLGameWindow`
 - `Sources/FactoriOSCompat/FOSWindowFrame.m`: `FOSCompatSetWindowFrame`
 

@@ -49,6 +49,10 @@ void FOSCompatSetBackgrounded(BOOL backgrounded);
 /// Caps presented frames per second; 0 or less removes the cap.
 void FOSCompatSetFrameRateCap(NSInteger framesPerSecond);
 
+/// Number of frames submitted through `presentDrawable:` since the Metal compatibility hooks were installed.
+/// The app-facing FPS counter samples this value; unlike Metal's developer HUD, it works on stock iOS.
+uint64_t FOSCompatPresentedFrameCount(void);
+
 /// Keeps `window` at `frame` (screen points), even if its class resets its frame during layout as SDL's window does.
 void FOSCompatSetWindowFrame(UIWindow *window, CGRect frame);
 

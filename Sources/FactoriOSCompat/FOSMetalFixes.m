@@ -25,6 +25,7 @@ static const NSUInteger FOSStorageModeManaged = 1;
 
 static NSInteger fosFrameRateCap = 0;
 static BOOL fosBackgrounded = NO;
+static uint64_t fosPresentedFrameCount = 0;
 
 static NSCondition *FOSFrameGate(void) {
     static NSCondition *gate;
@@ -53,6 +54,10 @@ void FOSCompatSetBackgrounded(BOOL backgrounded) {
 
 void FOSCompatSetFrameRateCap(NSInteger framesPerSecond) {
     __atomic_store_n(&fosFrameRateCap, framesPerSecond, __ATOMIC_RELAXED);
+}
+
+uint64_t FOSCompatPresentedFrameCount(void) {
+    return __atomic_load_n(&fosPresentedFrameCount, __ATOMIC_RELAXED);
 }
 
 /// Holds the calling thread while the app is in the background, where iOS ends apps that submit GPU work.
@@ -210,6 +215,9 @@ static _Thread_local BOOL fosPresentingCapped = NO;
 
 /// -[MTLCommandBuffer presentDrawable:] with the frame-rate cap: each frame stays on screen at least 1/cap seconds.
 static void FOSPresentDrawable(id commandBuffer, SEL cmd, id drawable) {
+    if (!fosPresentingCapped) {
+        __atomic_add_fetch(&fosPresentedFrameCount, 1, __ATOMIC_RELAXED);
+    }
     NSInteger cap = __atomic_load_n(&fosFrameRateCap, __ATOMIC_RELAXED);
     if (cap <= 0 || fosPresentingCapped) {
         fosPresentDrawable(commandBuffer, cmd, drawable);

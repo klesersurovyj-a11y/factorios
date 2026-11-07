@@ -34,6 +34,25 @@ PROCESS_CALLS = (
     "_execv", "_fork", "_posix_spawnp", "__NSGetExecutablePath", "_dlopen",
     "_MTLCopyAllDevices", "_MTLCopyAllDevicesWithObserver", "_MTLRemoveDeviceObserver",
 )
+REPLACED_SYMBOLS = {
+    "_NSApp",
+    "_OBJC_CLASS_$_NSBitmapImageRep",
+    "_OBJC_CLASS_$_NSColorSpace",
+    "_OBJC_CLASS_$_NSWorkspace",
+    "_UAZoomEnabled",
+    "_IOPMAssertionCreateWithDescription",
+    "_IOPMAssertionRelease",
+    "_clGetPlatformIDs",
+    "_clGetDeviceIDs",
+    "_clGetDeviceInfo",
+    "_MTLCopyAllDevices",
+    "_MTLCopyAllDevicesWithObserver",
+    "_MTLRemoveDeviceObserver",
+    "_execv",
+    "_fork",
+    "__NSGetExecutablePath",
+}
+PRELOAD_REDIRECTS = {"_nan": "libSystem.B.dylib"}
 MAC_ONLY_METAL_SELECTORS = (
     "setDisplaySyncEnabled_", "didModifyRange_", "synchronizeResource_", "synchronizeTexture_slice_level_",
     "isLowPower", "isHeadless", "isRemovable", "location", "maxTransferRate", "peerGroupID",
@@ -163,22 +182,24 @@ class Xrefs:
         index = bisect.bisect_right(self.starts, address) - 1
         return self.starts[index], self.starts[index + 1] if index + 1 < len(self.starts) else self.end
 
-    def reach(self, address: int, depth: int) -> set[int | str]:
-        """Everything referenced by the function at `address` and the functions it calls, `depth` calls deep."""
+    def reach(self, addresses: tuple[int, ...], node_limit: int = 250_000) -> tuple[set[int | str], int]:
+        """Everything referenced by the direct-call graph rooted at `addresses`, to a fixed point."""
         seen: set[int] = set()
         found: set[int | str] = set()
-        pending = [(address, 0)]
+        pending = list(addresses)
         while pending:
-            start, level = pending.pop()
+            start = pending.pop()
             if start in seen:
                 continue
+            if len(seen) >= node_limit:
+                raise RuntimeError(f"initializer call graph exceeded the {node_limit}-function safety limit")
             seen.add(start)
             first, end = self.bounds(start)
             for pc in range(first, end, 4):
                 found |= self.by_pc.get(pc, set())
-                if level < depth and pc in self.calls:
-                    pending.append((self.calls[pc], level + 1))
-        return found
+                if pc in self.calls:
+                    pending.append(self.calls[pc])
+        return found, len(seen)
 
 
 def section(title: str) -> None:
@@ -253,11 +274,20 @@ def report_initializers(sl: Slice, xrefs: Xrefs, libraries: dict[str, set[str]])
     start = sl.offset + init.offset
     initializers = struct.unpack(f"<{init.size // 8}Q", sl.raw[start : start + init.size])
     library_of = {symbol: library for library, symbols in libraries.items() for symbol in symbols}
-    reached = set().union(*(xrefs.reach(address, depth=3) for address in initializers))
+    reached, function_count = xrefs.reach(initializers)
     imports = sorted(s for s in reached if isinstance(s, str) and s in library_of)
-    risky = [s for s in imports if library_of[s] in MAC_ONLY or s in PROCESS_CALLS]
-    print(f"__mod_init_func: {len(initializers)} initializers; imports reached three calls deep: {len(imports)}")
-    print(f"  from Mac-only libraries or replaced by FactoriOS: {', '.join(risky) or 'none'}")
+    replaced = [s for s in imports if s in REPLACED_SYMBOLS]
+    preload = [s for s in imports if s in PRELOAD_REDIRECTS]
+    unavailable = [
+        s for s in imports if library_of[s] in MAC_ONLY and s not in REPLACED_SYMBOLS and s not in PRELOAD_REDIRECTS
+    ]
+    print(
+        f"__mod_init_func: {len(initializers)} initializers; "
+        f"{function_count} functions reached to fixed point; {len(imports)} imports"
+    )
+    print(f"  replaced symbols reached before slot patching: {', '.join(replaced) or 'none'}")
+    print(f"  pre-load library redirects: {', '.join(f'{s} → {PRELOAD_REDIRECTS[s]}' for s in preload) or 'none'}")
+    print(f"  unhandled Mac-only symbols reached: {', '.join(unavailable) or 'none'}")
     others = sorted({library_of[s] for s in imports} - {"libSystem.B.dylib", "libobjc.A.dylib"})
     print(f"  other libraries reached: {', '.join(others)}")
 
