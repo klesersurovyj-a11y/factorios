@@ -233,6 +233,7 @@ they prove nothing about behaviour. Each item is **deferred, not verified**:
 | Area | What has to be seen on a device |
 |---|---|
 | Build | xtool builds the package for iOS: FactoriOSCompat, FactoriOSRuntime and FactoriOSUI have never been compiled, only written against the iOS 17 SDK. |
+| Provisioning | xtool's exact Apple Development identity and private key can be handed to FactoriOS as PKCS#12; stable xtool does not currently document that export. |
 | Import | A full import on the device (memory, time, Files app visibility of the Factorio folder). Hard links, the extents overflow tree and compressed files were absent from the demo image, so those paths have never run on real data. |
 | Signing | The converted library, signed with the Personal Team Apple Development identity that provisioned FactoriOS, passes library validation and `dlopen`s (feasibility gate 1). |
 | Loading | dyld accepts a macOS binary retagged as iOS; weak imports from missing frameworks resolve to zero; the slots fill. |

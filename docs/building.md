@@ -71,17 +71,24 @@ extended addressing.
 
 ### Personal Team provisioning
 
-This project targets Apple's free, own-device development workflow—not App Store submission:
+This project targets Apple's free, own-device development workflow—not App Store submission. The supported app
+packager is xtool; this repository does not yet provide an Xcode app project or installable scheme.
 
-1. Let Xcode or xtool create the Personal Team provisioning profile and install FactoriOS on the registered device.
-2. On the Mac, export the **same Apple Development identity**, including its private key, from Keychain Access as a
-   password-protected `.p12`.
+1. `xtool dev` creates the Personal Team provisioning profile, signs FactoriOS, and installs it on the registered
+   device.
+2. FactoriOS needs the **same Apple Development identity**, including its private key, as a password-protected `.p12`
+   so it can sign the imported game. Stable xtool does not currently document this export; implementing and verifying
+   that identity handoff is a setup gate before device testing. A separately generated Xcode identity is not valid.
 3. Import that `.p12` in FactoriOS. The converted game is separate executable code, so it must carry a valid embedded
-   signature from the same identity before iOS can load it.
+   signature from the host's identity before iOS can load it.
 
-Apple's [membership comparison](https://developer.apple.com/support/compare-memberships) distinguishes this free
-on-device testing path from App Store/TestFlight distribution, which requires paid Developer Program membership.
-Even with paid membership, the current imported-code runtime is not App Store eligible under review guideline 2.5.2.
+Apple's [developer account documentation](https://developer.apple.com/help/account/basics/about-your-developer-account/)
+states the free Personal Team limits: App IDs, registered devices, and provisioning profiles expire after seven days;
+the app must then be rebuilt and reinstalled. A free account allows up to three devices and three installed apps per
+device.
+
+The free path provides no App Store Connect or TestFlight access. Paid Developer Program membership enables those
+distribution services, but the current imported-code runtime remains ineligible under App Review guideline 2.5.2.
 
 `scripts/make-icon` redraws `Resources/AppIcon.png`.
 

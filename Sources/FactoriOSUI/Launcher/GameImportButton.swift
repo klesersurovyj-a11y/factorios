@@ -43,7 +43,7 @@ struct GameImportButton: View {
     }
 }
 
-/// Picks the host app's Apple Development identity (`.p12` exported from macOS Keychain), asks for its password and
+/// Picks the Apple Development identity that provisioned the host app, exported as `.p12`, asks for its password and
 /// imports it.
 struct CertificateImportButton: View {
     let installation: GameInstallation

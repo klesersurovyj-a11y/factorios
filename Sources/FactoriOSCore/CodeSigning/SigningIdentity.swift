@@ -2,8 +2,8 @@ public import Foundation
 
 /// A certificate and private key that can sign code for this device.
 ///
-/// The runtime provides one backed by the Keychain (the Apple Development identity exported from the developer's
-/// Mac as PKCS#12); the signer only needs the certificates and an RSA signing primitive, so it stays portable.
+/// The runtime provides one backed by the Keychain (the host app's Apple Development identity imported as PKCS#12);
+/// the signer only needs the certificates and an RSA signing primitive, so it stays portable.
 public protocol SigningIdentity: Sendable {
     /// The DER-encoded certificate chain, leaf first (Apple's WWDR intermediate included if available).
     var certificateChain: [Data] { get }

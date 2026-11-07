@@ -2,7 +2,7 @@ import FactoriOSCore
 import Foundation
 import Security
 
-/// The host app's Apple Development identity, exported from macOS Keychain as PKCS#12.
+/// The Apple Development identity that provisioned the host app, imported as PKCS#12.
 ///
 /// The PKCS#12 file lives in `GamePaths.signingIdentity` and its password in the Keychain; Security decodes the file
 /// and holds the private key, which never leaves it.

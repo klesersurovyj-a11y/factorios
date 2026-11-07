@@ -44,9 +44,9 @@ struct WelcomeView: View {
         StepCard(number: 1, title: "Apple Development identity", done: installation.hasSigningIdentity) {
             Text(
                 """
-                iOS only runs code signed for this device. Export the Apple Development identity used to install \
-                FactoriOS from macOS Keychain as a .p12, then pick it here. FactoriOS signs the game with that same \
-                identity.
+                iOS only runs code signed for this device. Import a .p12 containing the exact Apple Development \
+                identity xtool used to install FactoriOS; a different certificate will not work. FactoriOS signs the \
+                game with that identity.
                 """
             )
             .font(.callout)
