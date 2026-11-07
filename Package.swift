@@ -32,6 +32,13 @@ let core: Target = .target(
 // sees every target.
 let coreOnly = Context.environment["FACTORIOS_CORE_ONLY"] != nil
 
+// The development Mac's command that imports, converts and signs the game before it is copied to a device. It only
+// exists in the host build, so xtool's iOS project never sees a macOS executable.
+let hostTargets: [Target] =
+    coreOnly
+    ? [.executableTarget(name: "FactoriOSPrepare", dependencies: ["FactoriOSCore"], swiftSettings: strictSwift)]
+    : []
+
 // SDL3's official, pinned Apple XCFramework is prepared by the iOS build and dev tasks. xtool embeds the binary target
 // in the app's Frameworks directory, where the game's static SDL3 finds it through SDL3_DYNAMIC_API.
 let appleTargets: [Target] =
@@ -59,7 +66,10 @@ let appleTargets: [Target] =
 // xtool builds the FactoriOS library into FactoriOS.app.
 let products: [Product] =
     coreOnly
-    ? [.library(name: "FactoriOSCore", targets: ["FactoriOSCore"])]
+    ? [
+        .library(name: "FactoriOSCore", targets: ["FactoriOSCore"]),
+        .executable(name: "factorios-prepare", targets: ["FactoriOSPrepare"]),
+    ]
     : [.library(name: "FactoriOS", targets: ["FactoriOSApp"])]
 
 let package = Package(
@@ -70,5 +80,5 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
         .package(url: "https://github.com/apple/swift-asn1.git", from: "1.7.4"),
     ],
-    targets: [core] + appleTargets
+    targets: [core] + hostTargets + appleTargets
 )

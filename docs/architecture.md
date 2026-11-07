@@ -93,6 +93,7 @@ CMS SignedData with Apple's CDHash attributes, built with SwiftASN1.
 ### FactoriOSCore: game, settings and controls
 
 - `Sources/FactoriOSCore/Game/GamePaths.swift`: `GamePaths`, `GamePaths.standard`
+- `Sources/FactoriOSCore/Game/GameLibrary.swift`: `GameLibrary`, `GameLibrary.redirectedSymbols`, `GameLibrary.convert`, `GameLibrary.write`
 - `Sources/FactoriOSCore/Game/GameSettings.swift`: `GameSettings`, `GameSettings.SpriteQuality`, `GameSettings.FrameRate`, `GameSettings.Frame`
 - `Sources/FactoriOSCore/Game/SettingsStore.swift`: `SettingsStore`, `SettingsStore.load`, `SettingsStore.save`
 - `Sources/FactoriOSCore/Game/FactorioConfig.swift`: `FactorioConfig`, `FactorioConfig.update`, `FactorioConfig.write`
@@ -224,6 +225,15 @@ controller.
 ### FactoriOSApp
 
 - `Sources/FactoriOSApp/FactoriOSMain.swift`: `FactoriOSMain`, `FactoriOSMain.main`
+
+### FactoriOSPrepare
+
+The development Mac's `factorios-prepare` (host build only): `GameImporter`, then `GameLibrary.convert` and
+`GameLibrary.write`, then `codesign` with the certificate that signed the device build. `mise run device` copies the
+result into the app's Application Support/FactoriOS, where `GameInstallation` finds it ready; the device needs neither
+the `.dmg` nor a `.p12`. On-device import remains for machines without that step.
+
+- `Sources/FactoriOSPrepare/main.swift`: `Options`, `SourceStamp`, `importIfNeeded`, `sign`
 
 ## Deferred: verified only on a device
 

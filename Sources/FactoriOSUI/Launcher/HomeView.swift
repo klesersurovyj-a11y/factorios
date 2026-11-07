@@ -5,7 +5,6 @@ import SwiftUI
 /// The launcher's main screen: Continue the newest save or open Factorio's main menu, and the way to the rest.
 struct HomeView: View {
     let game: ImportedGame
-    let installation: GameInstallation
     let coordinator: LaunchCoordinator
     let model: LauncherModel
 
@@ -35,11 +34,6 @@ struct HomeView: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(.red)
-            }
-            if !installation.hasSigningIdentity {
-                Label("No Apple Development identity: import it again in Settings.", systemImage: "checkmark.seal")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
             }
         }
     }

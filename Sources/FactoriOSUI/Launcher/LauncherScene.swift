@@ -56,7 +56,7 @@ struct LauncherScene: View {
         case .signing:
             InstallProgressView(step: .signing)
         case .ready(let game):
-            HomeView(game: game, installation: installation, coordinator: coordinator, model: model)
+            HomeView(game: game, coordinator: coordinator, model: model)
         }
     }
 

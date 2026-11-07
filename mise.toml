@@ -177,12 +177,30 @@ xcodebuild \
   build
 """
 
-[tasks.device]
-description = "Builds, installs and launches the app on the configured iPhone or iPad"
+[tasks.prepare-game]
+description = "Imports, converts and signs the game on this Mac with the identity that signed the device build"
 depends = ["build-device"]
+run = """
+derived_data="${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}"
+certificates="$(mktemp -d)"
+codesign -d --extract-certificates="$certificates/cert" "$derived_data/Build/Products/Debug-iphoneos/FactoriOS-App.app"
+identity="$(shasum -a 1 "$certificates/cert0" | cut -d ' ' -f 1)"
+rm -rf "$certificates"
+FACTORIOS_CORE_ONLY=1 swift run -c release factorios-prepare \
+  --dmg "${FACTORIOS_DMG:?set FACTORIOS_DMG in mise.local.toml}" \
+  --output artifact/game/FactoriOS \
+  --identity "$identity"
+"""
+
+[tasks.device]
+description = "Builds the app and the game, installs both on the configured iPhone or iPad and launches it"
+depends = ["prepare-game"]
 run = """
 device_id="${FACTORIOS_DEVICE_ID:?set FACTORIOS_DEVICE_ID in mise.local.toml}"
 derived_data="${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}"
 xcrun devicectl device install app --device "$device_id" "$derived_data/Build/Products/Debug-iphoneos/FactoriOS-App.app"
+xcrun devicectl device copy to --device "$device_id" \
+  --domain-type appDataContainer --domain-identifier app.factorios \
+  --source artifact/game/FactoriOS --destination "Library/Application Support/FactoriOS"
 xcrun devicectl device process launch --device "$device_id" --terminate-existing app.factorios
 """

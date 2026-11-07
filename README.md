@@ -32,12 +32,15 @@ flowchart LR
   Personal Team. Which device generations can run the game within their CPU and memory limits remains a device-test
   gate.
 - Factorio for macOS from [factorio.com/download](https://factorio.com/download) (the demo works too).
-- The exact `Apple Development` identity Xcode used to sign FactoriOS, exported with its private key as a
-  password-protected `.p12`.
+
+`mise run device` builds the app, imports and converts the game on the Mac, signs it with the same certificate as the
+app, and copies both to the device, which opens ready to play. Importing on the device instead needs that certificate
+exported with its private key as a password-protected `.p12`.
 
 This is Apple's developer-owned, connected-device workflow, not App Store or TestFlight distribution. xtool generates
 the Xcode workspace from the Swift package; Xcode performs automatic signing and installation. The imported-code
-runtime is not App Store eligible.
+runtime is not App Store eligible. The game is copied into the app's data on your own device, never into the app or
+the repository.
 
 ## Factorio
 

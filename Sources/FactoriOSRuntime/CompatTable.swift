@@ -1,4 +1,5 @@
 import FactoriOSCompat
+import FactoriOSCore
 
 /// The compatibility layer's replacement table (FOSCompatReplacements) in Swift form.
 enum CompatTable {
@@ -11,11 +12,12 @@ enum CompatTable {
             let entry = table[index]
             result[String(cString: entry.symbol)] = entry.replacement
         }
+        // A library converted on a Mac records the slots of GameLibrary.redirectedSymbols; any symbol the two lists
+        // disagree on would go unpatched or unresolved.
+        precondition(
+            Set(result.keys) == GameLibrary.redirectedSymbols,
+            "FOSCompatReplacements and GameLibrary.redirectedSymbols differ"
+        )
         return result
-    }
-
-    /// The symbols whose slots the converter records.
-    static func symbols() -> Set<String> {
-        Set(replacements().keys)
     }
 }

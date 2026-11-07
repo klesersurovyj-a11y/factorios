@@ -33,7 +33,8 @@ FACTORIOS_DMG = "/path/to/factorio_mac.dmg"
 | `mise run build-simulator` | writes a simulator app to the configured DerivedData directory | macOS with Xcode |
 | `mise run simulator` | builds, installs and launches the app in the configured iOS Simulator | macOS with Xcode |
 | `mise run build-device` | builds and signs for the configured device with Xcode automatic signing | macOS with Xcode |
-| `mise run device` | builds, installs and launches the app on the configured iPhone or iPad | macOS with Xcode |
+| `mise run prepare-game` | imports, converts and signs `$FACTORIOS_DMG` into `artifact/game/FactoriOS` | macOS with Xcode |
+| `mise run device` | builds the app and the game, installs both on the configured device and launches it | macOS with Xcode |
 | `mise run dev` | builds, signs and installs directly through xtool | an xtool development machine |
 
 `check` sets `FACTORIOS_CORE_ONLY` for its host build, which hides the iOS-only targets. `check-ios` needs Xcode's iOS
@@ -63,20 +64,23 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
    `xtool/FactoriOS.xcworkspace`. The generated workspace is disposable and ignored; regenerate it after package or
    packaging changes.
 3. **Build and install:** add the developer's Apple Account in Xcode → Settings → Accounts, connect and trust the
-   iPhone or iPad, and enable Developer Mode. Put the device UDID (`xcrun devicectl list devices`) and Personal Team ID
-   in the ignored `mise.local.toml` as `FACTORIOS_DEVICE_ID` and `FACTORIOS_TEAM_ID`, then run `mise run device`.
-   Xcode's automatic signing creates the development certificate and device provisioning profile. On the first install,
-   trust the developer under Settings → General → VPN & Device Management before launching. Opening
-   `xtool/FactoriOS.xcworkspace` and pressing Run in Xcode is equivalent. This project targets developer-owned devices;
-   it does not need an exported IPA, TestFlight or an App Store workflow.
-4. **Export the matching identity:** in Keychain Access, export the `Apple Development` identity Xcode used—certificate
-   and private key—as a password-protected `.p12`. Transfer that file to the device and import it in FactoriOS. The
-   converted game is separate executable code and must be signed with the same identity as the host app.
+   iPhone or iPad, and enable Developer Mode. Put the device UDID (`xcrun devicectl list devices`), the Personal Team
+   ID and the Factorio macOS disk image in the ignored `mise.local.toml` as `FACTORIOS_DEVICE_ID`, `FACTORIOS_TEAM_ID`
+   and `FACTORIOS_DMG`, then run `mise run device`. Xcode's automatic signing creates the development certificate and
+   device provisioning profile. On the first install, trust the developer under Settings → General → VPN & Device
+   Management before launching. This project targets developer-owned devices; it does not need an exported IPA,
+   TestFlight or an App Store workflow.
+4. **The game:** `mise run device` also runs `factorios-prepare` on the Mac. It imports the disk image (skipped while
+   the image is unchanged), converts the executable with the same `FactoriOSCore` code the app uses, and signs the
+   library with `codesign` using the certificate taken from the device build, so the library and the app share one
+   identity. `devicectl` then copies `artifact/game/FactoriOS` into the app's Application Support/FactoriOS, copying
+   only changed files on later runs. The app opens on its home screen with the game ready; the device needs neither the
+   `.dmg` nor a `.p12`.
 
-Linux and WSL developers can instead use `mise run dev` after completing
-[xtool's setup](https://xtool.sh/documentation/xtool/installation-linux), but must obtain the exact identity xtool used
-for signing; the Xcode workflow is the supported macOS path because its identity is exportable through Keychain
-Access.
+Without that step, the app can still import on the device: export the `Apple Development` identity that signed the
+app—certificate and private key, from Keychain Access → login → My Certificates—as a password-protected `.p12`, import
+it in FactoriOS, then import the `.dmg`. Linux and WSL developers use this path after `mise run dev` and
+[xtool's setup](https://xtool.sh/documentation/xtool/installation-linux), with the exact identity xtool used.
 
 For a launcher-only smoke test, set `FACTORIOS_SIMULATOR_ID` and optionally `FACTORIOS_DERIVED_DATA` in the ignored
 `mise.local.toml`, then run `mise run simulator`. The imported game is device code and its signing and loading gates
@@ -92,12 +96,8 @@ extended addressing.
 
 This project targets Apple's free, own-device development workflow—not App Store submission. xtool generates the Xcode
 workspace from the Swift package; Xcode performs its standard automatic signing and connected-device installation.
-
-1. Run `mise run xcode-project`, open `xtool/FactoriOS.xcworkspace`, select the Personal Team and run on the device.
-2. In Keychain Access, find the `Apple Development` certificate whose private key is nested beneath it and whose team
-   matches Xcode's signing setting. Export both together as a password-protected `.p12`.
-3. Import that `.p12` in FactoriOS before importing Factorio. A different development certificate—even for the same
-   account—will not satisfy library validation.
+The converted game is separate executable code, so it must carry a signature from the same certificate as the app;
+`mise run prepare-game` reads that certificate from the built app, and the on-device path needs it as a `.p12`.
 
 ### Device validation
 
@@ -112,18 +112,18 @@ this procedure passes. The four decisive runtime gates and the full verification
 - An arm64 iPhone or iPad on iOS 17 or later, connected, trusted and selected as Xcode's run destination.
 - Full Xcode with the developer's Apple Account and Personal Team configured, plus the pinned tools from
   `mise install`.
-- The demo `.dmg` and the password-protected `.p12` exported from the exact Xcode identity that signed FactoriOS.
+- A Factorio macOS `.dmg` configured as `FACTORIOS_DMG`, plus `FACTORIOS_DEVICE_ID` and `FACTORIOS_TEAM_ID`, in
+  `mise.local.toml`.
 
 Record the commit, Factorio version, device model, iOS version, signing-team type and entitlement file before testing.
 
 #### Procedure
 
-1. Run FactoriOS from `xtool/FactoriOS.xcworkspace` on the connected device. Pass when Xcode installs it and the
-   launcher opens without terminating.
-2. Import the matching `.p12`. Pass when FactoriOS accepts its password and reports that the signing identity is
-   available.
-3. Import the demo `.dmg`. Record the duration and final installation stage. Pass when extraction, conversion and
-   signing reach Ready, and the Factorio folder is visible through the Files app.
+1. Run `mise run device`. Pass when the app installs, the game is copied and, after the developer is trusted, the
+   launcher opens on its home screen showing the imported version.
+2. Check the prepared library: `codesign -dv artifact/game/FactoriOS/Converted/factorio.dylib` reports identifier
+   `factorio` and the same `TeamIdentifier` as the app. Record how long the Mac's import, conversion and copy took.
+3. Open the Factorio folder through the Files app. Pass when it is visible and writable.
 4. Start **Main menu**. Pass the sign/load gate when the converted library passes validation, `dlopen` succeeds and
    Factorio reaches its main function. Preserve both FactoriOS and game logs even on success.
 5. Reach the Factorio menu and start a new demo game. Pass the SDL and Metal gates when the window renders correctly,
