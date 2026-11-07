@@ -1,0 +1,20 @@
+# Objective-C and C in Sources/FactoriOSCompat. Needs the iOS SDK headers, so it runs on a Mac:
+#   mise run tidy
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  objc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -misc-include-cleaner,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'Sources/FactoriOSCompat/.*'
+CheckOptions:
+  readability-function-cognitive-complexity.Threshold: 15
+  readability-function-size.LineThreshold: 80

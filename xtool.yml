@@ -1,0 +1,6 @@
+version: 1
+bundleID: app.factorios
+product: FactoriOS
+infoPath: Resources/Info.plist
+entitlementsPath: Resources/FactoriOS.entitlements
+iconPath: Resources/AppIcon.png

@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+.venv/
+mise.local.toml
+/xtool/
+*.ipa
+/artifact
+/reference

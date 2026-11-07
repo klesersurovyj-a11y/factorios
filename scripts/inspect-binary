@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""Feasibility report for a Factorio macOS build: what the arm64 slice links, and who calls the Mac-only parts.
+
+usage: scripts/inspect-binary [path/to/factorio | path/to/factorio.dmg]   (default: $FACTORIOS_DMG)
+
+A disk image is opened with 7-Zip and only Contents/MacOS/factorio is extracted (to a temp dir).
+"""
+
+from __future__ import annotations
+
+import bisect
+import collections
+import os
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+import lief
+import numpy as np
+
+CPU_ARM64 = 0x0100000C
+APP_BINARY = "factorio.app/Contents/MacOS/factorio"
+MAC_ONLY = (
+    "AppKit", "Carbon", "CoreServices", "ApplicationServices", "IOKit", "ForceFeedback",
+    "OpenGL", "OpenCL", "OpenAL", "LDAP", "CoreVideo",
+)
+# Present on iOS, but with macOS-only symbols the game may reach.
+PARTLY_ON_IOS = ("Metal", "QuartzCore", "CoreGraphics", "Security", "GameController")
+PROCESS_CALLS = (
+    "_execv", "_fork", "_posix_spawnp", "__NSGetExecutablePath", "_dlopen",
+    "_MTLCopyAllDevices", "_MTLCopyAllDevicesWithObserver", "_MTLRemoveDeviceObserver",
+)
+MAC_ONLY_METAL_SELECTORS = (
+    "setDisplaySyncEnabled_", "didModifyRange_", "synchronizeResource_", "synchronizeTexture_slice_level_",
+    "isLowPower", "isHeadless", "isRemovable", "location", "maxTransferRate", "peerGroupID",
+    "recommendedMaxWorkingSetSize", "supportsBCTextureCompression", "hasUnifiedMemory",
+)
+# Functions that belong to the game's statically linked SDL3 (never executed once SDL3_DYNAMIC_API redirects it).
+SDL_OWNED = re.compile(
+    r"SDL|Cocoa|COREAUDIO|COREMEDIA|IOS_|hid|HID|GCController|METAL_|CAMERA|Pen|Pasteboard|AudioQueue|"
+    r"UpdateKeymap|GetDisplayMode|invisibleCursor|LoadHiddenSystemCursor|ScheduleContextUpdates|GetNSScreen|"
+    r"ScreenForRect|DARWIN|MACOS|AddHIDElement|CallbackIOService|create_device_info|PLATFORM_read_thread|"
+    r"FreeDevice|get_report|set_report|RefreshPhysicalDevices|Default\w+DeviceChangedNotification|"
+    r"DeviceAliveNotification|GetDirectionalPadForController|CheckControllerSiriRemote|ElementAlreadyHandled|"
+    r"CheckCameraPermissions|FindCoreMediaCameraByUniqueID|GetApplicationName|SetWindowStyle|SetDrawState|"
+    r"ShouldAdjustCoordinatesForGrab|MakePipelineState|GetSampler|Curl|sectransp|CopyCertSubject|verify_cert|"
+    r"pkp_pin_peer_pubkey|trio_|fileline_|Joystick|MacHaptic|IsControlledBy360|append_cert_to_array",
+)
+
+
+@dataclass
+class Slice:
+    """The arm64 slice: parsed Mach-O plus its raw bytes for disassembly. `fat` owns `macho`'s memory."""
+
+    fat: lief.MachO.FatBinary
+    macho: lief.MachO.Binary
+    raw: bytes
+    offset: int
+
+    def words(self, section: str) -> tuple[np.ndarray, int]:
+        sec = self.macho.get_section(section)
+        return np.frombuffer(self.raw, dtype="<u4", count=sec.size // 4, offset=self.offset + sec.offset), sec.virtual_address
+
+
+def binary_path(arg: str) -> Path:
+    path = Path(arg)
+    if path.suffix != ".dmg":
+        return path
+    out = Path(tempfile.mkdtemp(prefix="factorios-"))
+    subprocess.run(["7zz", "e", "-y", f"-o{out}", str(path), f"*/{APP_BINARY}", "-r"], check=True, capture_output=True)
+    return out / "factorio"
+
+
+def load_arm64(path: Path) -> Slice:
+    raw = path.read_bytes()
+    offset = 0
+    if raw[:4] == b"\xca\xfe\xba\xbe":
+        for index in range(struct.unpack(">I", raw[4:8])[0]):
+            cpu, _, start, _, _ = struct.unpack(">IIIII", raw[8 + index * 20 : 28 + index * 20])
+            if cpu == CPU_ARM64:
+                offset = start
+    fat = lief.MachO.parse(str(path))
+    macho = next(b for b in fat if b.header.cpu_type == lief.MachO.Header.CPU_TYPE.ARM64)
+    return Slice(fat, macho, raw, offset)
+
+
+def adrp_page(word: int, pc: int) -> int:
+    imm = (((word >> 5) & 0x7FFFF) << 2) | ((word >> 29) & 3)
+    if imm & (1 << 20):
+        imm -= 1 << 21
+    return (pc & ~0xFFF) + (imm << 12)
+
+
+def adrp_targets(code: list[int], base: int) -> list[tuple[int, int]]:
+    """(pc, address) for every ADRP followed by an LDR/ADD on the same register."""
+    found = []
+    for index, word in enumerate(code):
+        if word & 0x9F000000 != 0x90000000:
+            continue
+        reg, pc = word & 31, base + index * 4
+        page = adrp_page(word, pc)
+        for follow in code[index + 1 : index + 5]:
+            if (follow >> 5) & 31 != reg:
+                continue
+            if follow & 0xFFC00000 == 0xF9400000:
+                found.append((pc, page + ((follow >> 10) & 0xFFF) * 8))
+                break
+            if follow & 0xFFC00000 == 0x91000000:
+                found.append((pc, page + ((follow >> 10) & 0xFFF)))
+                break
+    return found
+
+
+class Xrefs:
+    """Which function references which imported symbol or selector-cache global."""
+
+    def __init__(self, sl: Slice) -> None:
+        self.slots = {b.address: b.symbol.name for b in sl.macho.bindings if b.has_symbol}
+        text, self.base = sl.words("__text")
+        functions = sorted((s.value, s.name) for s in sl.macho.symbols if self.base <= s.value < self.base + text.size * 4)
+        self.starts = [value for value, _ in functions]
+        self.names = [name for _, name in functions]
+        self.symbol_values = {s.name: s.value for s in sl.macho.symbols if s.value}
+        self.refs: dict[int | str, set[int]] = collections.defaultdict(set)
+        self._stubs(sl, text)
+        for pc, target in adrp_targets(text.tolist(), self.base):
+            self.refs[self.slots.get(target, target)].add(pc)
+
+    def _stubs(self, sl: Slice, text: np.ndarray) -> None:
+        stubs, stub_base = sl.words("__stubs")
+        targets = {}
+        for index in range(0, stubs.size, 3):
+            pc = stub_base + index * 4
+            slot = adrp_page(int(stubs[index]), pc) + ((int(stubs[index + 1]) >> 10) & 0xFFF) * 8
+            targets[pc] = self.slots.get(slot)
+        pcs = self.base + np.arange(text.size, dtype=np.int64) * 4
+        is_bl = (text & 0xFC000000) == 0x94000000
+        imm = (text & 0x03FFFFFF).astype(np.int64)
+        imm = np.where(imm & (1 << 25), imm - (1 << 26), imm)
+        for pc, target in zip(pcs[is_bl].tolist(), (pcs + imm * 4)[is_bl].tolist(), strict=True):
+            if targets.get(target):
+                self.refs[targets[target]].add(pc)
+
+    def function(self, pc: int) -> str:
+        return self.names[bisect.bisect_right(self.starts, pc) - 1]
+
+    def callers(self, key: int | str) -> list[str]:
+        return sorted({self.function(pc) for pc in self.refs.get(key, ())})
+
+
+def section(title: str) -> None:
+    print(f"\n## {title}\n")
+
+
+def report_load_commands(sl: Slice) -> None:
+    header = sl.macho.header
+    section("Header and load commands")
+    print(f"filetype={header.file_type.name} flags={[f.name for f in header.flags_list]}")
+    first = min(s.offset for s in sl.macho.get_segment("__TEXT").sections if s.offset)
+    print(f"sizeofcmds={header.sizeof_cmds} first section at {first:#x}: {first - 32 - header.sizeof_cmds} bytes free")
+    for cmd in sl.macho.commands:
+        detail = ""
+        if isinstance(cmd, lief.MachO.SegmentCommand):
+            detail = f"{cmd.name} vm={cmd.virtual_address:#x}+{cmd.virtual_size:#x}"
+        elif isinstance(cmd, lief.MachO.DylibCommand):
+            detail = cmd.name
+        elif isinstance(cmd, lief.MachO.BuildVersion):
+            detail = f"{cmd.platform.name} minos={cmd.minos} sdk={cmd.sdk}"
+        print(f"{cmd.command.name:<22} {detail}")
+
+
+def imports_by_library(sl: Slice) -> dict[str, set[str]]:
+    libraries: dict[str, set[str]] = collections.defaultdict(set)
+    for binding in sl.macho.bindings:
+        if binding.has_symbol and binding.has_library:
+            libraries[binding.library.name.split("/")[-1]].add(binding.symbol.name)
+    return libraries
+
+
+def report_game_owned(xrefs: Xrefs, libraries: dict[str, set[str]]) -> None:
+    section("Mac-only imports called outside SDL (the compatibility layer's real surface)")
+    for library in sorted(set(libraries) & set(MAC_ONLY + PARTLY_ON_IOS)):
+        users = {
+            symbol: [f for f in xrefs.callers(symbol) if not SDL_OWNED.search(f)]
+            for symbol in sorted(libraries[library])
+        }
+        owned = {symbol: callers for symbol, callers in users.items() if callers}
+        if library in MAC_ONLY or owned:
+            print(f"{library}: {len(libraries[library])} imports, {len(owned)} reached by game code")
+            for symbol, callers in owned.items():
+                print(f"  {symbol} <- {', '.join(callers[:3])}")
+
+
+def report_process(xrefs: Xrefs) -> None:
+    section("Process and device entry points")
+    for symbol in PROCESS_CALLS:
+        print(f"{symbol} <- {', '.join(xrefs.callers(symbol)) or '-'}")
+
+
+def report_metal(xrefs: Xrefs) -> None:
+    section("metal-cpp selectors missing or different on iOS, and who uses them")
+    found = 0
+    for selector in MAC_ONLY_METAL_SELECTORS:
+        pattern = re.compile(rf"Selector\d+s_k{selector}E$")
+        address = next((v for n, v in xrefs.symbol_values.items() if pattern.search(n)), None)
+        users = xrefs.callers(address) if address else []
+        found += bool(users)
+        print(f"{selector}: {', '.join(users[:4]) or 'unused'}")
+    if not found:
+        raise SystemExit("no metal-cpp selector cache was referenced: the selector lookup no longer matches")
+
+
+def report_strings(sl: Slice) -> None:
+    section("Strings")
+    for needle in (b"SDL3_DYNAMIC_API", b"newLibraryWithSource", b"newDefaultLibrary", b"/proc/self"):
+        print(f"{needle.decode()}: {sl.raw.count(needle)} occurrence(s)")
+
+
+def main() -> int:
+    source = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("FACTORIOS_DMG", "")
+    if not source:
+        print(__doc__)
+        return 2
+    sl = load_arm64(binary_path(source))
+    xrefs = Xrefs(sl)
+    report_load_commands(sl)
+    libraries = imports_by_library(sl)
+    report_game_owned(xrefs, libraries)
+    report_process(xrefs)
+    report_metal(xrefs)
+    report_strings(sl)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

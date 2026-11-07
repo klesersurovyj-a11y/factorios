@@ -1,0 +1,96 @@
+included:
+  - Package.swift
+  - Sources
+excluded:
+  - .build
+  - reference
+
+strict: true
+
+# Every opt-in rule, minus the ones listed below with the reason they don't fit.
+opt_in_rules:
+  - all
+
+disabled_rules:
+  # Conflict with swift-format, which owns layout.
+  - attributes
+  - closure_end_indentation
+  - conditional_returns_on_newline
+  - contrasted_opening_brace
+  - indentation_width
+  - multiline_arguments_brackets
+  - multiline_literal_brackets
+  - multiline_parameters_brackets
+  - trailing_comma
+  - vertical_whitespace_between_cases
+  # Contradict each other or Swift 6 defaults.
+  - explicit_acl
+  - explicit_enum_raw_value
+  - explicit_top_level_acl
+  - explicit_type_interface
+  - no_extension_access_modifier
+  - no_grouping_extension
+  - required_deinit
+  - prefixed_toplevel_constant
+  # Binary formats are made of constants: names live in enums, offsets don't.
+  - no_magic_numbers
+  # Types, members and files are ordered by meaning, not by kind.
+  - file_types_order
+  - type_contents_order
+  - sorted_enum_cases
+  - one_declaration_per_file
+  # Documentation is required on the public surface only (see missing_docs below).
+  - explicit_self
+
+cyclomatic_complexity:
+  warning: 15
+  error: 15
+  ignores_case_statements: false
+
+file_length:
+  warning: 1000
+  error: 1000
+  ignore_comment_only_lines: true
+
+function_body_length:
+  warning: 60
+  error: 80
+
+type_body_length:
+  warning: 350
+  error: 500
+
+line_length:
+  warning: 120
+  error: 120
+  ignores_urls: true
+
+nesting:
+  type_level: 2
+  function_level: 2
+
+identifier_name:
+  min_length: 2
+  excluded: [i, x, y, n]
+
+missing_docs:
+  warning: [open, public]
+
+custom_rules:
+  empty_function_body:
+    name: Empty function body
+    message: "A function must do something; an intentional no-op needs a comment saying why."
+    regex: '\bfunc\s+[^{}\n]*\{\s*\}'
+    match_kinds: [keyword, identifier, typeidentifier, parameter, attribute.builtin]
+    severity: error
+  bare_stub_return:
+    name: Bare stub return
+    message: "A body that only returns nil or nothing is a stub; add a comment with the reason."
+    regex: '\{\s*return(\s+nil)?\s*\}'
+    severity: error
+  unimplemented_marker:
+    name: Unimplemented marker
+    message: "No TODO, FIXME or unimplemented placeholders."
+    regex: '(TODO|FIXME|fatalError\("unimplemented|notImplemented)'
+    match_kinds: [comment, string, identifier]
+    severity: error

@@ -1,0 +1,55 @@
+# Shared toolchain for FactoriOS. Machine-specific additions go in mise.local.toml (not committed).
+[tools]
+swift = "6.4.2"
+swiftlint = "0.65.1"
+python = "3.12"
+uv = "latest"
+"pipx:clang-tidy" = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.setup]
+description = "Python packages for the binary inspection scripts"
+run = "uv pip install --quiet --requirement scripts/requirements.txt"
+
+[tasks.inspect]
+description = "Feasibility report for a Factorio macOS build ($FACTORIOS_DMG or the path given)"
+run = "python3 scripts/inspect-binary"
+
+[tasks.lint]
+description = "SwiftLint, strict"
+run = "swiftlint lint --strict --quiet"
+
+[tasks.format-check]
+description = "swift-format, strict"
+run = "swift format lint --strict --recursive --parallel Package.swift Sources"
+
+[tasks.format]
+description = "Rewrites sources with swift-format"
+run = "swift format format --in-place --recursive --parallel Package.swift Sources"
+
+[tasks.build-host]
+description = "Compiles the platform-independent target on this machine (no run)"
+env = { FACTORIOS_CORE_ONLY = "1" }
+run = "swift build --target FactoriOSCore"
+
+[tasks.tidy]
+description = "clang-tidy over the Objective-C compatibility layer (needs the iOS SDK: macOS only)"
+run = "clang-tidy --quiet Sources/FactoriOSCompat/*.m -- -x objective-c -fobjc-arc -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\" -target arm64-apple-ios17.0 -ISources/FactoriOSCompat/include"
+
+[tasks.check-architecture]
+description = "Every file and API listed in docs/architecture.md exists"
+run = "python3 scripts/check-architecture"
+
+[tasks.check-size]
+description = "Implementation files stay under 1000 lines"
+run = "python3 scripts/check-size"
+
+[tasks.check-markers]
+description = "No TODO/FIXME/unimplemented placeholders"
+run = "! grep -rnE 'TODO|FIXME|fatalError\\(\"unimplemented|notImplemented' Sources Package.swift"
+
+[tasks.check]
+description = "Every static check that runs on Linux"
+depends = ["lint", "format-check", "build-host", "check-architecture", "check-size", "check-markers"]
