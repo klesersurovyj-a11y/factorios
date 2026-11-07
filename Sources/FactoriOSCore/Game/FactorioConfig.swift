@@ -11,7 +11,9 @@ public enum FactorioConfig {
         "elevated-rail-shadows",
     ]
 
-    /// Returns `ini` with FactoriOS's keys set: paths, input method, UI scale, sprite quality, effects, FPS counter.
+    /// Returns `ini` with FactoriOS's keys set: paths, input method, UI scale, sprite quality and effects.
+    ///
+    /// The FPS counter isn't a `config.ini` key: the runtime turns on Metal's performance HUD instead.
     ///
     /// - Parameters:
     ///   - ini: The current `config.ini` text, empty when there is none yet.
@@ -40,7 +42,6 @@ public enum FactorioConfig {
                 config = set(config, section: "graphics", key: key, value: shown)
             }
         }
-        config = set(config, section: "other", key: "show-fps", value: String(settings.fpsCounter))
         return config
     }
 
