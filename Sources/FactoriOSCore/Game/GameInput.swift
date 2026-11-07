@@ -34,7 +34,9 @@ public enum PadButton: Int, CaseIterable, Codable, Sendable {
     case dpadRight = 14
 }
 
-/// An analog control of the game's controller. Raw values are SDL3's `SDL_GamepadAxis` numbers.
+/// An analog control of the game's controller.
+///
+/// Raw values are SDL3's `SDL_GamepadAxis` numbers.
 public enum PadAxis: Int, CaseIterable, Codable, Sendable {
     /// Left stick, horizontal: walking.
     case leftX = 0

@@ -32,6 +32,8 @@ disabled_rules:
   - no_grouping_extension
   - required_deinit
   - prefixed_toplevel_constant
+  # Swift 6 only: no Swift 5 clients to keep compatible.
+  - incompatible_concurrency_annotation
   # Binary formats are made of constants: names live in enums, offsets don't.
   - no_magic_numbers
   # Types, members and files are ordered by meaning, not by kind.

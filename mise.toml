@@ -53,3 +53,7 @@ run = "! grep -rnE 'TODO|FIXME|fatalError\\(\"unimplemented|notImplemented' Sour
 [tasks.check]
 description = "Every static check that runs on Linux"
 depends = ["lint", "format-check", "build-host", "check-architecture", "check-size", "check-markers"]
+
+[tasks.sdl3]
+description = "Builds SDL3 for iOS into Vendor/SDL3.xcframework (macOS only)"
+run = "scripts/build-sdl3.sh"

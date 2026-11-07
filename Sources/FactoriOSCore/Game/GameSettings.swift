@@ -19,7 +19,7 @@ public struct GameSettings: Codable, Equatable, Sendable {
     /// The size of the margin round the game, which keeps rounded screen corners off its menus.
     public enum Frame: Int, Codable, CaseIterable, Sendable {
         /// No margin.
-        case none = 0
+        case off = 0
         /// A thin margin.
         case thin = 10
         /// A wide margin.
@@ -50,7 +50,7 @@ public struct GameSettings: Codable, Equatable, Sendable {
     public static let defaults = Self(
         resolutionScale: 100,
         frameRate: .sixty,
-        frame: .none,
+        frame: .off,
         spriteQuality: .high,
         lightGraphics: false,
         fpsCounter: false,

@@ -18,19 +18,22 @@ public struct GamePaths: Sendable, Equatable {
 
     /// The layout in the app's own container.
     public static func standard(fileManager: FileManager = .default) throws -> Self {
-        let support = try fileManager.url(
+        let supportRoot = try fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
             appropriateFor: nil,
             create: true
         )
-        let documents = try fileManager.url(
+        let documentsRoot = try fileManager.url(
             for: .documentDirectory,
             in: .userDomainMask,
             appropriateFor: nil,
             create: true
         )
-        return Self(support: support.appendingPathComponent("FactoriOS", isDirectory: true), documents: documents)
+        return Self(
+            support: supportRoot.appendingPathComponent("FactoriOS", isDirectory: true),
+            documents: documentsRoot
+        )
     }
 
     /// The imported `factorio.app`.

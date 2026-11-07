@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Checks docs/architecture.md against the sources.
+
+Two kinds of lines are checked:
+
+- File entries: "- `Sources/<path>`: `Name`, `Type.member`, ..." -- the file exists and declares every name
+  (the last dotted component; `init` matches an initializer).
+- Compatibility rows: "| `MacAPI` | `selector:or_function` | `FOSName` | backing |" -- the FactoriOS name is declared
+  in Sources/FactoriOSCompat and the selector or function appears there.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DOC = ROOT / "docs" / "architecture.md"
+COMPAT = ROOT / "Sources" / "FactoriOSCompat"
+FILE_ENTRY = re.compile(r"^- `(Sources/[^`]+)`:\s*(.+)$")
+COMPAT_ROW = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|")
+SWIFT_DECL = r"\b(class|struct|enum|protocol|actor|func|var|let|case|typealias)\s+{name}\b"
+OBJC_DECL = (
+    r"(@interface\s+{name}\b|@implementation\s+{name}\b|@protocol\s+{name}\b|[\s*]{name}\s*\("
+    r"|[-+]\s*\([^)]*\)\s*{name}\b|\}}\s*{name}\s*;|#define\s+{name}\b)"
+)
+
+
+def declares(text: str, suffix: str, name: str) -> bool:
+    if name == "init":
+        return re.search(r"\binit[?!]?\s*\(", text) is not None or "- (instancetype)init" in text
+    pattern = SWIFT_DECL if suffix == ".swift" else OBJC_DECL
+    return re.search(pattern.format(name=re.escape(name)), text) is not None
+
+
+def check_file_entry(path: str, names: str) -> list[str]:
+    source = ROOT / path
+    if not source.is_file():
+        return [f"missing file: {path}"]
+    text = source.read_text(encoding="utf-8")
+    problems = []
+    for name in re.findall(r"`([^`]+)`", names):
+        last = name.split(".")[-1].split("(")[0]
+        if not declares(text, source.suffix, last):
+            problems.append(f"{path}: no declaration of {name}")
+    return problems
+
+
+def compat_text() -> str:
+    return "\n".join(p.read_text(encoding="utf-8") for p in sorted(COMPAT.rglob("*")) if p.suffix in {".h", ".m"})
+
+
+def check_compat_row(mac_api: str, member: str, replacement: str, text: str) -> list[str]:
+    problems = []
+    if not re.search(rf"\b{re.escape(replacement)}\b", text):
+        problems.append(f"compat: {replacement} (for {mac_api}) is not in Sources/FactoriOSCompat")
+    first_piece = member.split(":")[0]
+    if not re.search(rf"\b{re.escape(first_piece)}\b", text):
+        problems.append(f"compat: {mac_api} {member} is not implemented in Sources/FactoriOSCompat")
+    return problems
+
+
+def main() -> int:
+    if not DOC.is_file():
+        print(f"missing {DOC.relative_to(ROOT)}")
+        return 1
+    problems = []
+    entries = rows = 0
+    compat = compat_text() if COMPAT.is_dir() else ""
+    for line in DOC.read_text(encoding="utf-8").splitlines():
+        if match := FILE_ENTRY.match(line):
+            entries += 1
+            problems += check_file_entry(match.group(1), match.group(2))
+        elif (match := COMPAT_ROW.match(line)) and match.group(1) != "Mac API":
+            rows += 1
+            problems += check_compat_row(*match.groups(), compat)
+    for problem in problems:
+        print(problem)
+    print(f"{entries} file entries, {rows} compatibility rows, {len(problems)} problem(s)")
+    return 1 if problems or not entries or not rows else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -30,10 +30,14 @@ let core: Target = .target(
 // FACTORIOS_CORE_ONLY to compile the core on the build machine itself; xtool, which cross-compiles from Linux too,
 // sees every target.
 let coreOnly = Context.environment["FACTORIOS_CORE_ONLY"] != nil
+
+// SDL3 for iOS, built by `mise run sdl3` on a Mac. xtool embeds binary targets in the app's Frameworks directory,
+// where the game's static SDL3 finds it through SDL3_DYNAMIC_API.
 let appleTargets: [Target] =
     coreOnly
     ? []
     : [
+        .binaryTarget(name: "SDL3", path: "Vendor/SDL3.xcframework"),
         // The game's Mac-only API surface on UIKit/Metal, and the SDL3 bridge.
         .target(name: "FactoriOSCompat", cSettings: strictObjC),
         // Signing, loading and running the converted game.
@@ -45,7 +49,11 @@ let appleTargets: [Target] =
         // SwiftUI launcher and on-screen controller.
         .target(name: "FactoriOSUI", dependencies: ["FactoriOSCore", "FactoriOSRuntime"], swiftSettings: strictSwift),
         // Entry point: hands the app's start-up to SDL, as SDL requires on iOS.
-        .target(name: "FactoriOSApp", dependencies: ["FactoriOSUI", "FactoriOSRuntime"], swiftSettings: strictSwift),
+        .target(
+            name: "FactoriOSApp",
+            dependencies: ["FactoriOSUI", "FactoriOSRuntime", "SDL3"],
+            swiftSettings: strictSwift
+        ),
     ]
 // xtool builds the FactoriOS library into FactoriOS.app.
 let products: [Product] =
