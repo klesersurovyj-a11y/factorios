@@ -38,6 +38,18 @@ FACTORIOS_DMG = "/path/to/factorio_mac.dmg"
 `build-host` sets `FACTORIOS_CORE_ONLY`, which hides the iOS-only targets from the package so the host's own Swift
 can compile the core.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+- Ubuntu installs the pinned mise toolchain, builds `FactoriOSCore`, and runs every task in `mise run check`.
+- macOS builds the pinned SDL3 XCFramework, runs clang-tidy against the iOS SDK, and compiles `FactoriOSApp` for
+  `arm64-apple-ios17.0`.
+
+Actions are pinned by commit SHA, workflow permissions are read-only, duplicate runs are cancelled, and both jobs
+have timeouts. Binary feasibility inspection is not a CI step because the proprietary Factorio disk image is
+deliberately absent from the repository; `mise run inspect` remains the explicit local check for each game release.
+
 ## The app
 
 1. **SDL3 for iOS**, once (macOS with Xcode and CMake): `mise run sdl3` builds `Vendor/SDL3.xcframework`

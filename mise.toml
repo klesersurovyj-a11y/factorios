@@ -3,8 +3,10 @@
 swift = "6.4.2"
 swiftlint = "0.65.1"
 python = "3.12"
-uv = "latest"
-"pipx:clang-tidy" = "latest"
+uv = "0.13.7"
+"pipx:clang-tidy" = "23.1.4"
+jactionlint = "2.5.0"
+shellcheck = "0.11.0"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
@@ -36,7 +38,14 @@ run = "swift build --target FactoriOSCore"
 
 [tasks.tidy]
 description = "clang-tidy over the Objective-C compatibility layer (needs the iOS SDK: macOS only)"
-run = "clang-tidy --quiet Sources/FactoriOSCompat/*.m -- -x objective-c -fobjc-arc -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\" -target arm64-apple-ios17.0 -ISources/FactoriOSCompat/include"
+run = """
+clang-tidy --quiet Sources/FactoriOSCompat/*.m -- \
+  -x objective-c -fobjc-arc -fblocks -fmodules \
+  -fmodules-cache-path="${TMPDIR:-/tmp}/factorios-clang-modules" \
+  -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  -target arm64-apple-ios17.0 \
+  -ISources/FactoriOSCompat/include
+"""
 
 [tasks.check-architecture]
 description = "Every file and API listed in docs/architecture.md exists"
@@ -50,9 +59,33 @@ run = "python3 scripts/check-size"
 description = "No TODO/FIXME/unimplemented placeholders"
 run = "! grep -rnE 'TODO|FIXME|fatalError\\(\"unimplemented|notImplemented' Sources Package.swift"
 
+[tasks.check-support]
+description = "Checks workflows and scripts, and parses both entitlement property lists"
+run = """
+jactionlint
+sh -n scripts/build-sdl3.sh
+python3 - <<'PY'
+import ast
+import pathlib
+import xml.etree.ElementTree as ElementTree
+
+ast.parse(pathlib.Path("scripts/inspect-binary").read_text())
+ElementTree.parse("Resources/FactoriOS.entitlements")
+ElementTree.parse("Resources/FactoriOS.memory.entitlements")
+PY
+"""
+
 [tasks.check]
 description = "Every static check that runs on Linux"
-depends = ["lint", "format-check", "build-host", "check-architecture", "check-size", "check-markers"]
+depends = [
+  "lint",
+  "format-check",
+  "build-host",
+  "check-architecture",
+  "check-size",
+  "check-markers",
+  "check-support",
+]
 
 [tasks.sdl3]
 description = "Builds SDL3 for iOS into Vendor/SDL3.xcframework (macOS only)"

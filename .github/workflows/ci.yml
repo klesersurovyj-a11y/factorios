@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    name: Portable build and checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          cache: true
+          install: true
+
+      - name: Install inspection dependencies
+        run: mise run setup
+
+      - name: Build and verify portable code
+        run: mise run check
+
+  ios:
+    name: iOS compile and Objective-C analysis
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install pinned tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          cache: true
+          install: true
+
+      - name: Build pinned SDL3 framework
+        run: mise run sdl3
+
+      - name: Analyze Objective-C compatibility layer
+        run: mise run tidy
+
+      - name: Compile iOS targets
+        run: |
+          swift build \
+            --triple arm64-apple-ios17.0 \
+            --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+            --target FactoriOSApp
