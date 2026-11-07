@@ -9,8 +9,8 @@ NSErrorDomain const FOSSDLErrorDomain = @"FOSSDLErrorDomain";
 typedef struct FOSSDLWindow FOSSDLWindow;
 typedef struct FOSSDLJoystick FOSSDLJoystick;
 
-static const uint32_t FOSSDLInitJoystick = 0x00000200u;  // SDL_INIT_JOYSTICK
-static const uint32_t FOSSDLInitGamepad = 0x00002000u;   // SDL_INIT_GAMEPAD
+static const uint32_t FOSSDLInitJoystick = 0x00000200U;  // SDL_INIT_JOYSTICK
+static const uint32_t FOSSDLInitGamepad = 0x00002000U;   // SDL_INIT_GAMEPAD
 static const uint16_t FOSSDLJoystickTypeGamepad = 1;     // SDL_JOYSTICK_TYPE_GAMEPAD
 static const uint32_t FOSSDLEventMouseWheel = 0x403;     // SDL_EVENT_MOUSE_WHEEL
 static const uint16_t FOSSDLGamepadButtons = 15;         // SDL_GAMEPAD_BUTTON_SOUTH ... SDL_GAMEPAD_BUTTON_DPAD_RIGHT
@@ -115,7 +115,7 @@ static NSError *FOSSDLMakeError(NSInteger code, NSString *message) {
 static void *_Nullable FOSSDLSymbol(void *handle, const char *name, NSMutableArray<NSString *> *missing) {
     void *symbol = dlsym(handle, name);
     if (symbol == NULL) {
-        [missing addObject:@(name)];
+        [missing addObject:[NSString stringWithUTF8String:name]];
     }
     return symbol;
 }
@@ -162,7 +162,9 @@ BOOL FOSSDLLoad(NSString *path, NSError *_Nullable *_Nullable error) {
     if (handle == NULL) {
         const char *reason = dlerror();
         if (error != NULL) {
-            NSString *message = reason != NULL ? @(reason) : [NSString stringWithFormat:@"Can't open %@", path];
+            NSString *message =
+                reason != NULL ? [NSString stringWithUTF8String:reason]
+                               : [NSString stringWithFormat:@"Can't open %@", path];
             *error = FOSSDLMakeError(1, message);
         }
         return NO;
@@ -194,7 +196,7 @@ BOOL FOSSDLSetHint(NSString *name, NSString *value) {
 
 NSString *FOSSDLLastError(void) {
     const char *message = fosSDL.GetError();
-    return message != NULL ? @(message) : @"";
+    return message != NULL ? [NSString stringWithUTF8String:message] : @"";
 }
 
 /// SDL_VirtualJoystickDesc.Rumble: forwards SDL's 16-bit strengths to the handler as 0...1.
@@ -224,8 +226,8 @@ BOOL FOSSDLAttachVirtualGamepad(NSString *name, void (^_Nullable rumble)(float l
     desc.type = FOSSDLJoystickTypeGamepad;
     desc.nbuttons = FOSSDLGamepadButtons;
     desc.naxes = FOSSDLGamepadAxes;
-    desc.button_mask = (1u << FOSSDLGamepadButtons) - 1u;
-    desc.axis_mask = (1u << FOSSDLGamepadAxes) - 1u;
+    desc.button_mask = (1U << FOSSDLGamepadButtons) - 1U;
+    desc.axis_mask = (1U << FOSSDLGamepadAxes) - 1U;
     desc.name = name.UTF8String;  // SDL copies the name while attaching.
     desc.Rumble = FOSSDLRumble;
     uint32_t instanceID = fosSDL.AttachVirtualJoystick(&desc);
@@ -280,7 +282,7 @@ static void FOSSDLWithFirstWindow(void (^body)(FOSSDLWindow *window)) {
     if (first != NULL) {
         body(first);
     }
-    fosSDL.Free(windows);
+    fosSDL.Free((void *)windows);
 }
 
 void FOSSDLWarpMouse(float x, float y) {

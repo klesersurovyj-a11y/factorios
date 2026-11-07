@@ -47,8 +47,8 @@ static Boolean fos_UAZoomEnabled(void) {
 typedef uint32_t FOSIOPMAssertionID;
 typedef int32_t FOSIOReturn;
 static const FOSIOReturn FOSIOReturnSuccess = 0;                       // kIOReturnSuccess
-static const FOSIOReturn FOSIOReturnBadArgument = (int32_t)0xE00002C2u;  // kIOReturnBadArgument
-static const FOSIOReturn FOSIOReturnNotFound = (int32_t)0xE00002F0u;     // kIOReturnNotFound
+static const FOSIOReturn FOSIOReturnBadArgument = (int32_t)0xE00002C2U;  // kIOReturnBadArgument
+static const FOSIOReturn FOSIOReturnNotFound = (int32_t)0xE00002F0U;     // kIOReturnNotFound
 
 /// Live assertion IDs; while any exists, the idle timer is off (iOS's counterpart of preventing display sleep).
 static NSMutableIndexSet *_Nullable fosAssertions = nil;
@@ -294,6 +294,6 @@ int FOSCompatWriteSlot(void *slot, const void *value) {
     if (result != KERN_SUCCESS) {
         return result;
     }
-    memcpy(slot, &value, sizeof(value));
+    memcpy(slot, (const void *)&value, sizeof(value));
     return vm_protect(mach_task_self(), page, pageSize, FALSE, info.protection);
 }

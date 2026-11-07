@@ -142,14 +142,15 @@ static char FOSDisplaySyncKey;
 /// for the getter.
 static void FOSLayerSetDisplaySyncEnabled(id layer, SEL cmd, BOOL enabled) {
     (void)cmd;
-    objc_setAssociatedObject(layer, &FOSDisplaySyncKey, @(enabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(layer, &FOSDisplaySyncKey, [NSNumber numberWithBool:enabled],
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 /// -[CAMetalLayer displaySyncEnabled]: the last value set; YES (what iOS does) by default.
 static BOOL FOSLayerDisplaySyncEnabled(id layer, SEL cmd) {
     (void)cmd;
     NSNumber *enabled = objc_getAssociatedObject(layer, &FOSDisplaySyncKey);
-    return enabled != nil ? enabled.boolValue : YES;
+    return enabled == nil ? YES : (BOOL)enabled.boolValue;
 }
 
 #pragma mark - Storage-mode swizzles

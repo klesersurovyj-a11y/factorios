@@ -2,7 +2,8 @@
 // game's class references for NSBitmapImageRep, NSColorSpace and NSWorkspace at these classes, so they answer exactly
 // the selectors the game sends (docs/feasibility.md lists them).
 
-#pragma once
+#ifndef FACTORIOS_FOS_APP_KIT_H
+#define FACTORIOS_FOS_APP_KIT_H
 
 @import CoreGraphics;
 @import Foundation;
@@ -75,3 +76,5 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 NS_ASSUME_NONNULL_END
+
+#endif  // FACTORIOS_FOS_APP_KIT_H

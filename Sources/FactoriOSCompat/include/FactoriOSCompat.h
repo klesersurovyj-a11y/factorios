@@ -3,7 +3,8 @@
 // The converter records the pointer slots through which the game reaches each symbol in FOSCompatReplacements; the
 // loader writes the replacement's address into those slots after dlopen. Everything here runs on a device only.
 
-#pragma once
+#ifndef FACTORIOS_COMPAT_H
+#define FACTORIOS_COMPAT_H
 
 @import Foundation;
 @import UIKit;
@@ -57,3 +58,5 @@ uint64_t FOSCompatPresentedFrameCount(void);
 void FOSCompatSetWindowFrame(UIWindow *window, CGRect frame);
 
 NS_ASSUME_NONNULL_END
+
+#endif  // FACTORIOS_COMPAT_H

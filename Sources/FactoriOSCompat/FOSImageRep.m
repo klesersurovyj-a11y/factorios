@@ -55,7 +55,7 @@
 /// The color space object for a decoded image's space: the shared sRGB one when it is sRGB.
 static FOSColorSpace *FOSColorSpaceFor(CGColorSpaceRef space) {
     CFStringRef name = CGColorSpaceCopyName(space);
-    BOOL isSRGB = name != NULL && CFEqual(name, kCGColorSpaceSRGB);
+    BOOL isSRGB = (BOOL)(name != NULL && CFEqual(name, kCGColorSpaceSRGB) != 0);
     if (name != NULL) {
         CFRelease(name);
     }
@@ -79,11 +79,11 @@ static BOOL FOSIsStraightRGBA8(CGImageRef image) {
     CGBitmapInfo info = CGImageGetBitmapInfo(image);
     CGImageAlphaInfo alpha = (CGImageAlphaInfo)(info & kCGBitmapAlphaInfoMask);
     CGBitmapInfo order = info & kCGBitmapByteOrderMask;
-    BOOL bigEndian = order == kCGBitmapByteOrderDefault || order == kCGBitmapByteOrder32Big;
-    BOOL straight = alpha == kCGImageAlphaLast || alpha == kCGImageAlphaNoneSkipLast;
-    return space != NULL && CGColorSpaceGetModel(space) == kCGColorSpaceModelRGB &&
-           CGImageGetBitsPerComponent(image) == 8 && CGImageGetBitsPerPixel(image) == 32 &&
-           (info & kCGBitmapFloatComponents) == 0 && bigEndian && straight;
+    BOOL bigEndian = (BOOL)(order == kCGBitmapByteOrderDefault || order == kCGBitmapByteOrder32Big);
+    BOOL straight = (BOOL)(alpha == kCGImageAlphaLast || alpha == kCGImageAlphaNoneSkipLast);
+    return (BOOL)(space != NULL && CGColorSpaceGetModel(space) == kCGColorSpaceModelRGB &&
+                  CGImageGetBitsPerComponent(image) == 8 && CGImageGetBitsPerPixel(image) == 32 &&
+                  (info & kCGBitmapFloatComponents) == 0 && bigEndian != NO && straight != NO);
 }
 
 /// Copies the pixels of a straight-RGBA8 image as they are, packing rows; nil when the data is short.
@@ -98,7 +98,7 @@ static NSMutableData *_Nullable FOSCopyStraightRGBA8(CGImageRef image) {
     }
     size_t rowLength = width * 4;
     size_t sourceLength = (size_t)CFDataGetLength(source);
-    if (stride < rowLength || sourceLength < stride * (height - 1) + rowLength) {
+    if (stride < rowLength || sourceLength < (stride * (height - 1)) + rowLength) {
         CFRelease(source);
         return nil;
     }
@@ -106,7 +106,7 @@ static NSMutableData *_Nullable FOSCopyStraightRGBA8(CGImageRef image) {
     const uint8_t *from = CFDataGetBytePtr(source);
     uint8_t *to = pixels.mutableBytes;
     for (size_t row = 0; row < height; row++) {
-        memcpy(to + row * rowLength, from + row * stride, rowLength);
+        memcpy(to + (row * rowLength), from + (row * stride), rowLength);
     }
     CFRelease(source);
     CGImageAlphaInfo alpha = (CGImageAlphaInfo)(CGImageGetBitmapInfo(image) & kCGBitmapAlphaInfoMask);
@@ -126,8 +126,8 @@ static void FOSUnpremultiply(uint8_t *pixels, size_t length) {
             continue;
         }
         for (size_t channel = 0; channel < 3; channel++) {
-            unsigned value = (pixels[offset + channel] * 255u + alpha / 2u) / alpha;
-            pixels[offset + channel] = (uint8_t)(value > 255u ? 255u : value);
+            unsigned value = ((pixels[offset + channel] * 255U) + (alpha / 2U)) / alpha;
+            pixels[offset + channel] = (uint8_t)(value > 255U ? 255U : value);
         }
     }
 }

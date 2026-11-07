@@ -4,7 +4,8 @@
 // does here (hints, the virtual gamepad, mouse events) is what the game sees. No SDL headers are needed to build: the
 // few SDL3 ABI pieces used are declared in FOSSDL.m.
 
-#pragma once
+#ifndef FACTORIOS_FOS_SDL_H
+#define FACTORIOS_FOS_SDL_H
 
 @import UIKit;
 
@@ -63,3 +64,5 @@ UIWindow *_Nullable FOSSDLGameWindow(void);
 BOOL FOSSDLHasWindow(void);
 
 NS_ASSUME_NONNULL_END
+
+#endif  // FACTORIOS_FOS_SDL_H
