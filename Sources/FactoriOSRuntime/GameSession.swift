@@ -45,14 +45,17 @@ final class GameSession {
     ///
     /// Throws, leaving the launcher up, when the game can't be loaded.
     func run(_ request: LaunchRequest) throws -> Never {
+        guard let library = paths.bundledLibrary, let manifestFile = paths.bundledSlotManifest else {
+            throw GameLaunchError.notInstalled
+        }
         let settings = try prepareSettings()
-        let manifest = try GameLoader.readManifest(paths.slotManifest)
+        let manifest = try GameLoader.readManifest(manifestFile)
         configureEnvironment(settings)
         configureSDL(settings)
         configureCompat(settings)
         let gameInput = try SDLGameInput(haptics: settings.vibration ? RumbleHaptics() : nil)
         try redirectOutput()
-        let game = try GameLoader.load(library: paths.convertedLibrary, manifest: manifest)
+        let game = try GameLoader.load(library: library, manifest: manifest)
 
         // The game is loaded: from here on it owns the process.
         input = gameInput

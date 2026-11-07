@@ -36,6 +36,7 @@ PROCESS_CALLS = (
 )
 REPLACED_SYMBOLS = {
     "_NSApp",
+    "_OBJC_CLASS_$_NSAppleEventManager",
     "_OBJC_CLASS_$_NSBitmapImageRep",
     "_OBJC_CLASS_$_NSColorSpace",
     "_OBJC_CLASS_$_NSWorkspace",

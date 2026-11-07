@@ -5,7 +5,6 @@ import SwiftUI
 /// The display, game and controller settings, and the game's files.
 struct SettingsView: View {
     @Bindable var model: LauncherModel
-    let installation: GameInstallation
 
     @State private var editingLayout = false
     @Environment(\.openURL) private var openURL
@@ -113,15 +112,13 @@ struct SettingsView: View {
             } label: {
                 Label("Open the Factorio folder in Files", systemImage: "folder")
             }
-            CertificateImportButton(installation: installation, title: "Import Apple Development identity again")
-            GameImportButton(installation: installation, title: "Import Factorio again")
         } header: {
             Text("Files")
         } footer: {
             Text(
                 """
                 The Factorio folder holds your saves, mods, config and scenarios; mod changes apply the next time \
-                the game starts. Import Factorio again for a new version, or after renewing the development identity.
+                the game starts. To update Factorio, run `mise run device` again from the Mac.
                 """
             )
         }

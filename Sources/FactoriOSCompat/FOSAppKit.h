@@ -1,6 +1,6 @@
-// The AppKit classes Factorio's own code uses, rebuilt on ImageIO, CoreGraphics and UIKit. The loader points the
-// game's class references for NSBitmapImageRep, NSColorSpace and NSWorkspace at these classes, so they answer exactly
-// the selectors the game sends (docs/feasibility.md lists them).
+// The Mac-only AppKit and Foundation classes Factorio's own code uses, rebuilt on ImageIO, CoreGraphics and UIKit.
+// The loader points the game's class references for NSAppleEventManager, NSBitmapImageRep, NSColorSpace and
+// NSWorkspace at these classes, so they answer exactly the selectors the game sends (docs/feasibility.md lists them).
 
 #ifndef FACTORIOS_FOS_APP_KIT_H
 #define FACTORIOS_FOS_APP_KIT_H
@@ -61,6 +61,23 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// The same pixel values, tagged as being in `space`.
 - (nullable FOSBitmapImageRep *)bitmapImageRepByRetaggingWithColorSpace:(FOSColorSpace *)space;
+
+@end
+
+/// NSAppleEventManager: iOS has no Apple Events, so the game's URL-handler registration is ignored.
+@interface FOSAppleEventManager : NSObject
+
+/// The shared manager; the same object on every call.
++ (FOSAppleEventManager *)sharedAppleEventManager;
+
+/// Ignores a URL handler: the game's SDL code registers one for `kInternetEventClass`/`kAEGetURL`.
+- (void)setEventHandler:(nullable id)handler
+            andSelector:(SEL)selector
+          forEventClass:(uint32_t)eventClass
+             andEventID:(uint32_t)eventID;
+
+/// Ignores a handler removal; there was nothing to remove.
+- (void)removeEventHandlerForEventClass:(uint32_t)eventClass andEventID:(uint32_t)eventID;
 
 @end
 

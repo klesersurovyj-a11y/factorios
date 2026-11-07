@@ -46,15 +46,7 @@ struct LauncherScene: View {
     private func stageView(_ model: LauncherModel) -> some View {
         switch installation.stage {
         case .notInstalled:
-            WelcomeView(installation: installation, error: nil)
-        case .failed(let message):
-            WelcomeView(installation: installation, error: message)
-        case .importing(let progress):
-            InstallProgressView(step: .importing(progress))
-        case .converting:
-            InstallProgressView(step: .converting)
-        case .signing:
-            InstallProgressView(step: .signing)
+            WelcomeView()
         case .ready(let game):
             HomeView(game: game, coordinator: coordinator, model: model)
         }
@@ -64,7 +56,7 @@ struct LauncherScene: View {
     private func destination(_ page: LauncherPage, model: LauncherModel) -> some View {
         switch page {
         case .settings:
-            SettingsView(model: model, installation: installation)
+            SettingsView(model: model)
         case .saves:
             SavesView(model: model)
         case .logs:

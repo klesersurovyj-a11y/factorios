@@ -127,8 +127,8 @@ struct BindState {
 }
 
 /// Walks `LC_DYLD_INFO` bind and lazy-bind opcode streams in place: marks every symbol bound from a weak
-/// library as a weak import (a length-preserving change to the opcode's immediate) and records the pointer slots
-/// of redirected symbols.
+/// library, and every redirected symbol, as a weak import (a length-preserving change to the opcode's immediate)
+/// and records the pointer slots of redirected symbols.
 struct BindStreamWalker {
     /// Which stream is walked: `BIND_OPCODE_DONE` ends a bind stream but only separates lazy-bind entries.
     enum Stream {
@@ -228,9 +228,13 @@ struct BindStreamWalker {
             guard state.ordinal <= libraries.count else {
                 throw MachOError.malformed("\(state.symbol) is bound from library \(state.ordinal), which isn't linked")
             }
-            if libraries[state.ordinal - 1].isWeak {
-                image[symbolOpcode] |= MachO.symbolFlagWeakImport
-            }
+        }
+        // Slots the compatibility layer fills are weak imports: a symbol the runtime supplies may be absent from the
+        // linked library (Foundation has no NSAppleEventManager on iOS), and dyld must load the image before those
+        // slots can be patched.
+        let weakLibrary = state.ordinal > 0 && libraries[state.ordinal - 1].isWeak
+        if weakLibrary || state.isRedirected {
+            image[symbolOpcode] |= MachO.symbolFlagWeakImport
         }
         if state.isRedirected, state.type == BindState.pointerType {
             slots[state.symbol, default: []].append(segment.vmAddress - imageBase + state.offset)

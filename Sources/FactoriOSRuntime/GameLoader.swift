@@ -27,8 +27,8 @@ struct GameLoader {
 
     /// dlopens the library (running its initializers), patches every recorded slot and finds the entry point.
     ///
-    /// Unverifiable without a device: that iOS accepts the on-device signature and that dyld loads the retagged
-    /// macOS image (docs/feasibility.md, gate 1).
+    /// Unverifiable without a device: that iOS accepts the embedded library's signature and that dyld loads the
+    /// retagged macOS image (docs/feasibility.md, gate 1).
     static func load(library: URL, manifest: SymbolSlotManifest) throws -> Self {
         // Load order: dlopen runs the game's initializers before any slot points at the compatibility layer. That is
         // safe because scripts/inspect-binary's load-time report shows the demo's 448 __mod_init_func initializers

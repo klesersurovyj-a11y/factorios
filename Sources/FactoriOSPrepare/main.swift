@@ -1,6 +1,6 @@
 // Prepares the game on a development Mac: imports the disk image, converts the executable and signs the library with
-// the Mac's keychain identity, producing the Application Support/FactoriOS layout the app reads. Copying that folder
-// into the app's container replaces the on-device import, so the device needs neither the .dmg nor a .p12.
+// the Mac's keychain identity, producing the Game and Converted folders the device build embeds and installs. The
+// device needs neither the .dmg nor a .p12.
 //
 // Usage: factorios-prepare --dmg <factorio_mac.dmg> --output <directory> --identity <codesign identity>
 

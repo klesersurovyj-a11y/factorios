@@ -24,7 +24,7 @@ enum GameLaunchError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notInstalled:
-            "The game isn't installed. Import the Factorio .dmg again."
+            "The game isn't installed. Build and install FactoriOS from the Mac with the prepare step."
         case .loadFailed(let reason):
             "iOS refused to load the game: \(reason)"
         case .imageNotFound:
@@ -32,9 +32,9 @@ enum GameLaunchError: Error, LocalizedError, Equatable {
         case .noEntryPoint:
             "The game has no entry point."
         case .noReplacement(let symbol):
-            "The installed game needs \(symbol), which this FactoriOS doesn't provide. Import the .dmg again."
+            "The game needs \(symbol), which this FactoriOS doesn't provide. Install a matching FactoriOS build."
         case .slotOutsideImage(let symbol):
-            "The installed game's record for \(symbol) doesn't match it. Import the .dmg again."
+            "The game's record for \(symbol) doesn't match it. Install a matching FactoriOS build."
         // swiftlint's pattern_matching_keywords wants `case let .x(a, b)`, which swift-format's
         // UseLetInEveryBoundCaseVariable rejects; the two rules contradict, so swift-format's form is kept.
         // swiftlint:disable:next pattern_matching_keywords

@@ -9,11 +9,14 @@ public struct GamePaths: Sendable, Equatable {
     public let support: URL
     /// Documents.
     public let documents: URL
+    /// The app bundle, where iOS only loads code embedded in the app; `nil` in the Mac's prepare tool.
+    public let bundle: URL?
 
     /// Creates the layout under the given container directories.
-    public init(support: URL, documents: URL) {
+    public init(support: URL, documents: URL, bundle: URL? = nil) {
         self.support = support
         self.documents = documents
+        self.bundle = bundle
     }
 
     /// The layout in the app's own container.
@@ -32,7 +35,8 @@ public struct GamePaths: Sendable, Equatable {
         )
         return Self(
             support: supportRoot.appendingPathComponent("FactoriOS", isDirectory: true),
-            documents: documentsRoot
+            documents: documentsRoot,
+            bundle: Bundle.main.bundleURL
         )
     }
 
@@ -47,9 +51,16 @@ public struct GamePaths: Sendable, Equatable {
     /// Facts about the imported game, written by the importer.
     public var gameInfo: URL { support.appendingPathComponent("Game/game.json") }
 
-    /// The converted, signed game library that FactoriOS loads.
+    /// The converted, signed game library that FactoriOS loads from the app bundle.
+    ///
+    /// iOS refuses to execute code from Application Support, so the Mac's prepare step embeds this file in the app.
+    public var bundledLibrary: URL? { bundle?.appendingPathComponent("Frameworks/factorio.dylib") }
+    /// The converter's slot manifest next to the embedded library.
+    public var bundledSlotManifest: URL? { bundle?.appendingPathComponent("Frameworks/factorio.slots.json") }
+
+    /// Where the Mac's prepare tool stages the converted library before the device build embeds it.
     public var convertedLibrary: URL { support.appendingPathComponent("Converted/factorio.dylib") }
-    /// The converter's record of which pointer slots the compatibility layer fills in.
+    /// Where the Mac's prepare tool stages the converter's slot manifest.
     public var slotManifest: URL { support.appendingPathComponent("Converted/slots.json") }
 
     /// The player's Factorio folder (`write-data`): saves, mods, config, scenarios.
@@ -67,6 +78,4 @@ public struct GamePaths: Sendable, Equatable {
     public var settingsFile: URL { support.appendingPathComponent("settings.json") }
     /// The on-screen controller layout.
     public var padLayoutFile: URL { support.appendingPathComponent("pad-layout.json") }
-    /// The host app's Apple Development identity, exported as PKCS#12.
-    public var signingIdentity: URL { support.appendingPathComponent("Signing/identity.p12") }
 }

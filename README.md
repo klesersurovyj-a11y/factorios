@@ -2,8 +2,8 @@
 
 Play your own copy of Factorio on an iPhone or iPad. FactoriOS imports the **macOS** build you download from
 factorio.com, turns it into a library iOS can load, signs it with the same Apple Development identity used to provision
-FactoriOS, and runs it natively. SDL3 for iOS and a small compatibility layer replace the few Mac-only APIs the game
-uses. No emulation, no streaming, and none of the game's files in the app.
+FactoriOS, embeds it in the app bundle, and runs it natively. SDL3 for iOS and a small compatibility layer replace the
+few Mac-only APIs the game uses. No emulation, no streaming, and none of the game's files in the app.
 
 **Status: written and compiled for iOS in CI, not yet run on a device.** Compilation proves no runtime behaviour.
 `docs/building.md` defines the device-validation procedure; `docs/architecture.md` lists every deferred result.
@@ -34,13 +34,13 @@ flowchart LR
 - Factorio for macOS from [factorio.com/download](https://factorio.com/download) (the demo works too).
 
 `mise run device` builds the app, imports and converts the game on the Mac, signs it with the same certificate as the
-app, and copies both to the device, which opens ready to play. Importing on the device instead needs that certificate
-exported with its private key as a password-protected `.p12`.
+app, embeds the signed library in the app bundle, and copies the game data to the device, which opens ready to play.
+iOS refuses to load code from the app's data container, so the library has to travel inside the app.
 
 This is Apple's developer-owned, connected-device workflow, not App Store or TestFlight distribution. xtool generates
 the Xcode workspace from the Swift package; Xcode performs automatic signing and installation. The imported-code
-runtime is not App Store eligible. The game is copied into the app's data on your own device, never into the app or
-the repository.
+runtime is not App Store eligible. The converted library lives in the installed app bundle and the game data in the
+app's container on your own device; neither is in the repository.
 
 ## Factorio
 

@@ -12,6 +12,7 @@ public enum GameLibrary {
     /// Must name exactly the entries of `FOSCompatReplacements`; the runtime checks this when it reads that table.
     public static let redirectedSymbols: Set<String> = [
         "_NSApp",
+        "_OBJC_CLASS_$_NSAppleEventManager",
         "_OBJC_CLASS_$_NSBitmapImageRep",
         "_OBJC_CLASS_$_NSColorSpace",
         "_OBJC_CLASS_$_NSWorkspace",
@@ -52,5 +53,14 @@ public enum GameLibrary {
         )
         try manifestData.write(to: paths.slotManifest, options: .atomic)
         try library.write(to: paths.convertedLibrary, options: .atomic)
+    }
+
+    /// Whether the app bundle contains the library and manifest that a device build embedded.
+    public static func isBundled(paths: GamePaths) -> Bool {
+        guard let library = paths.bundledLibrary, let manifest = paths.bundledSlotManifest else {
+            return false
+        }
+        let files = FileManager.default
+        return files.fileExists(atPath: library.path) && files.fileExists(atPath: manifest.path)
     }
 }

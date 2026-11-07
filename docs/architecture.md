@@ -7,7 +7,7 @@ Five modules, one direction of dependency:
 flowchart TB
     App[FactoriOSApp<br/>entry point] --> UI[FactoriOSUI<br/>SwiftUI launcher, on-screen controller]
     App --> Runtime
-    UI --> Runtime[FactoriOSRuntime<br/>install, sign, load, run]
+    UI --> Runtime[FactoriOSRuntime<br/>load, run]
     UI --> Core
     Runtime --> Core[FactoriOSCore<br/>disk image, Mach-O, signing, settings<br/>builds on Linux]
     Runtime --> Compat[FactoriOSCompat<br/>Objective-C: Mac APIs on UIKit/Metal, SDL3 bridge]
@@ -18,18 +18,16 @@ flowchart TB
 
 ```mermaid
 sequenceDiagram
-    participant P as Player
+    participant M as Mac prepare
     participant L as Launcher (UI)
     participant R as Runtime
     participant C as Core
     participant G as Factorio
-    P->>L: picks factorio .dmg and the signing .p12
-    L->>R: GameInstallation.install(from:)
-    R->>C: GameImporter (UDIF → bzip2 → HFS+ → factorio.app)
-    R->>C: GameConverter (arm64 slice → iOS dylib + slot manifest)
-    R->>C: MachOSigner (CodeDirectory + CMS with the host app's Apple Development identity)
-    P->>L: Continue / Main menu
-    L->>R: LaunchCoordinator.launch(_:)
+    M->>C: GameImporter (UDIF → bzip2 → HFS+ → factorio.app)
+    M->>C: GameConverter (arm64 slice → iOS dylib + slot manifest)
+    M->>M: codesign the library and the app with Xcode's Apple Development identity
+    M->>L: install the app with Frameworks/factorio.dylib and copy the game data
+    L->>R: GameInstallation reads the embedded library and game data
     R->>R: config.ini, SDL3_DYNAMIC_API, dlopen, fill compat slots, Metal fixes
     R->>G: LC_MAIN entry, on the main thread inside SDL's main callback
     G->>R: SDL calls (forwarded to SDL3 for iOS), Mac APIs (compat replacements)
@@ -78,9 +76,10 @@ recorded.
 
 ### FactoriOSCore: code signing
 
-A real embedded signature, made on the device with the Apple Development identity that provisioned FactoriOS:
-CodeDirectory 0x20400 (SHA-256, 4 KiB pages), empty requirements, optional entitlements (XML and DER), and a detached
-CMS SignedData with Apple's CDHash attributes, built with SwiftASN1.
+A portable embedded-signature implementation: CodeDirectory 0x20400 (SHA-256, 4 KiB pages), empty requirements,
+optional entitlements (XML and DER), and a detached CMS SignedData with Apple's CDHash attributes, built with
+SwiftASN1. The Mac prepare task delegates signing to `codesign` so Xcode's provisioning identity is applied exactly as
+it is to the app; the portable signer is kept for producing signatures without macOS tooling.
 
 - `Sources/FactoriOSCore/CodeSigning/SigningIdentity.swift`: `SigningIdentity`
 - `Sources/FactoriOSCore/CodeSigning/MachOSigner.swift`: `MachOSigner`, `MachOSigner.sign`
@@ -92,8 +91,8 @@ CMS SignedData with Apple's CDHash attributes, built with SwiftASN1.
 
 ### FactoriOSCore: game, settings and controls
 
-- `Sources/FactoriOSCore/Game/GamePaths.swift`: `GamePaths`, `GamePaths.standard`
-- `Sources/FactoriOSCore/Game/GameLibrary.swift`: `GameLibrary`, `GameLibrary.redirectedSymbols`, `GameLibrary.convert`, `GameLibrary.write`
+- `Sources/FactoriOSCore/Game/GamePaths.swift`: `GamePaths`, `GamePaths.standard`, `GamePaths.bundledLibrary`
+- `Sources/FactoriOSCore/Game/GameLibrary.swift`: `GameLibrary`, `GameLibrary.redirectedSymbols`, `GameLibrary.convert`, `GameLibrary.write`, `GameLibrary.isBundled`
 - `Sources/FactoriOSCore/Game/GameSettings.swift`: `GameSettings`, `GameSettings.SpriteQuality`, `GameSettings.FrameRate`, `GameSettings.Frame`
 - `Sources/FactoriOSCore/Game/SettingsStore.swift`: `SettingsStore`, `SettingsStore.load`, `SettingsStore.save`
 - `Sources/FactoriOSCore/Game/FactorioConfig.swift`: `FactorioConfig`, `FactorioConfig.update`, `FactorioConfig.write`
@@ -113,12 +112,8 @@ the UI only draws them and feeds them touches.
 ### FactoriOSRuntime
 
 - `Sources/FactoriOSRuntime/AppEntry.swift`: `AppEntry`, `AppEntry.run`
-- `Sources/FactoriOSRuntime/GameInstallation.swift`: `GameInstallation`, `GameInstallation.Stage`, `GameInstallation.install`, `GameInstallation.importSigningIdentity`
+- `Sources/FactoriOSRuntime/GameInstallation.swift`: `GameInstallation`, `GameInstallation.Stage`
 - `Sources/FactoriOSRuntime/LaunchCoordinator.swift`: `LaunchCoordinator`, `LaunchCoordinator.launch`
-- `Sources/FactoriOSRuntime/LibraryBuilder.swift`: `LibraryBuilder`
-- `Sources/FactoriOSRuntime/KeychainSigningIdentity.swift`: `KeychainSigningIdentity`, `SigningPasswordStore`
-- `Sources/FactoriOSRuntime/CertificateSubject.swift`: `CertificateSubject`
-- `Sources/FactoriOSRuntime/SigningIdentityError.swift`: `SigningIdentityError`
 - `Sources/FactoriOSRuntime/CompatTable.swift`: `CompatTable`
 - `Sources/FactoriOSRuntime/GameLoader.swift`: `GameLoader`
 - `Sources/FactoriOSRuntime/GameLaunchError.swift`: `GameLaunchError`
@@ -129,12 +124,13 @@ the UI only draws them and feeds them touches.
 - `Sources/FactoriOSRuntime/RuntimeLog.swift`: `RuntimeLog`
 - `Sources/FactoriOSRuntime/PresentedFrames.swift`: `PresentedFrames`, `PresentedFrames.current`
 
-Install: import (detached task) → `GameConverter.convert` with the compat table's symbols → `MachOSigner.sign` with the
-`.p12` identity from the keychain. Launch: `config.ini`; environment (`SDL3_DYNAMIC_API`, plus `MTL_DEBUG_LAYER` and
-`SDL_LOGGING` for detailed logs); stdout and stderr to `Logs/game.log`; Metal fixes; `dlopen`; slots filled through
-`vm_protect`; the overlay window above SDL's window (found through SDL's `SDL.window.uikit.window` property, inset by
-the Frame setting); then the game's `LC_MAIN` entry. The FPS overlay samples the presentation hook's monotonic frame
-count; it does not depend on Apple's developer-only Metal HUD.
+The Mac prepare step imports and converts the game, signs the library with the identity that signs the app, and
+embeds it in the app bundle; the launcher only finds the already-prepared library and game data. Launch: `config.ini`;
+environment (`SDL3_DYNAMIC_API`, plus `MTL_DEBUG_LAYER` and `SDL_LOGGING` for detailed logs); stdout and stderr to
+`Logs/game.log`; Metal fixes; `dlopen` of `Frameworks/factorio.dylib`; slots filled through `vm_protect`; the overlay
+window above SDL's window (found through SDL's `SDL.window.uikit.window` property, inset by the Frame setting); then
+the game's `LC_MAIN` entry. The FPS overlay samples the presentation hook's monotonic frame count; it does not depend
+on Apple's developer-only Metal HUD.
 
 ### FactoriOSCompat
 
@@ -202,8 +198,7 @@ are filled into the slots the converter recorded; Metal rows change the live Met
 - `Sources/FactoriOSUI/LauncherFactory.swift`: `LauncherFactory`, `LauncherFactory.makeLauncher`, `LauncherFactory.makeOverlay`
 - `Sources/FactoriOSUI/Launcher/LauncherModel.swift`: `LauncherModel`
 - `Sources/FactoriOSUI/Launcher/LauncherScene.swift`: `LauncherScene`, `LauncherPage`
-- `Sources/FactoriOSUI/Launcher/WelcomeView.swift`: `WelcomeView`, `InstallProgressView`
-- `Sources/FactoriOSUI/Launcher/GameImportButton.swift`: `GameImportButton`, `CertificateImportButton`
+- `Sources/FactoriOSUI/Launcher/WelcomeView.swift`: `WelcomeView`
 - `Sources/FactoriOSUI/Launcher/HomeView.swift`: `HomeView`
 - `Sources/FactoriOSUI/Launcher/SettingsView.swift`: `SettingsView`
 - `Sources/FactoriOSUI/Launcher/SavesView.swift`: `SavesView`, `SavesFolderDocument`
@@ -215,10 +210,10 @@ are filled into the slots the converter recorded; Metal rows change the live Met
 - `Sources/FactoriOSUI/Overlay/PadPainter.swift`: `PadPainter`
 - `Sources/FactoriOSUI/Overlay/PadToolbar.swift`: `PadToolbar`, `PadTool`
 
-Screens follow the Android launcher's features: welcome and import (the `.dmg` and the signing `.p12`), home (Continue
-the newest save, Main menu), settings (resolution, FPS cap, frame, sprite quality, light graphics, FPS counter,
-detailed logs, vibration, controller layout), saves (import, export), logs (FactoriOS's and the game's, copy all), and
-the Factorio folder in the Files app. The overlay draws the on-screen controller, turns touches on the game into
+Screens follow the Android launcher's features: welcome (build-and-install instructions when the prepared game is
+missing), home (Continue the newest save, Main menu), settings (resolution, FPS cap, frame, sprite quality, light
+graphics, FPS counter, detailed logs, vibration, controller layout), saves (import, export), logs (FactoriOS's and the
+game's, copy all), and the Factorio folder in the Files app. The overlay draws the on-screen controller, turns touches on the game into
 controller and mouse input (tap, double-tap-drag, long press, two-finger tap, pinch) and steps aside for a physical
 controller.
 
@@ -230,8 +225,9 @@ controller.
 
 The development Mac's `factorios-prepare` (host build only): `GameImporter`, then `GameLibrary.convert` and
 `GameLibrary.write`, then `codesign` with the certificate that signed the device build. `mise run device` copies the
-result into the app's Application Support/FactoriOS, where `GameInstallation` finds it ready; the device needs neither
-the `.dmg` nor a `.p12`. On-device import remains for machines without that step.
+signed library and manifest into the app's `Frameworks` folder, re-signs the app, installs it, and copies the game data
+into the app's Application Support/FactoriOS. The device needs neither the `.dmg` nor a `.p12`; iOS won't load code
+from the data container.
 
 - `Sources/FactoriOSPrepare/main.swift`: `Options`, `SourceStamp`, `importIfNeeded`, `sign`
 
@@ -243,9 +239,9 @@ checks, but that proves no device behaviour. Each item is **deferred, not verifi
 | Area | What has to be seen on a device |
 |---|---|
 | Build and install | The generated Xcode workspace builds, signs and installs FactoriOS, and the launcher opens on an iOS 17 or later device. |
-| Provisioning | The exact Xcode-managed Apple Development identity and private key can be exported through Keychain Access as PKCS#12, and FactoriOS accepts it. |
-| Import | A full import on the device (memory, time, Files app visibility of the Factorio folder). Hard links, the extents overflow tree and compressed files were absent from the demo image, so those paths have never run on real data. |
-| Signing | The converted library, signed with the Personal Team Apple Development identity that provisioned FactoriOS, passes library validation and `dlopen`s (feasibility gate 1). |
+| Provisioning | Xcode's automatic signing installs the app, `mise run device` re-signs it after embedding the library, and iOS still launches it. |
+| Import | The game data copied into the app container is visible and writable through the Files app. Hard links, the extents overflow tree and compressed files were absent from the demo image, so those paths have never run on real data. |
+| Signing | The embedded library, signed with the Personal Team Apple Development identity that provisioned FactoriOS, passes library validation and `dlopen`s from the app bundle (feasibility gate 1). |
 | Loading | dyld accepts a macOS binary retagged as iOS; weak imports from missing frameworks resolve to zero; the slots fill. |
 | SDL | The game's static SDL3 forwards to the bundled SDL3, and SDL's window, touch, audio and controllers work with the game's entry point running inside SDL's main callback (gate 2). |
 | Metal | The 110 shaders compile on iOS; rendering with managed storage turned into shared storage; the frame-rate cap and background frame gate (gate 3). |

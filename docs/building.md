@@ -73,14 +73,14 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
 4. **The game:** `mise run device` also runs `factorios-prepare` on the Mac. It imports the disk image (skipped while
    the image is unchanged), converts the executable with the same `FactoriOSCore` code the app uses, and signs the
    library with `codesign` using the certificate taken from the device build, so the library and the app share one
-   identity. `devicectl` then copies `artifact/game/FactoriOS` into the app's Application Support/FactoriOS, copying
-   only changed files on later runs. The app opens on its home screen with the game ready; the device needs neither the
+   identity. The task then copies `factorio.dylib` and `slots.json` into the app's `Frameworks` folder, re-signs the
+   app, and installs it. `devicectl` copies the game data into the app's Application Support/FactoriOS, copying only
+   changed files on later runs. The app opens on its home screen with the game ready; the device needs neither the
    `.dmg` nor a `.p12`.
 
-Without that step, the app can still import on the device: export the `Apple Development` identity that signed the
-app—certificate and private key, from Keychain Access → login → My Certificates—as a password-protected `.p12`, import
-it in FactoriOS, then import the `.dmg`. Linux and WSL developers use this path after `mise run dev` and
-[xtool's setup](https://xtool.sh/documentation/xtool/installation-linux), with the exact identity xtool used.
+iOS 18 and later refuse to `dlopen` code from an app's data container even when that code carries a valid signature,
+which is why the library must be embedded in the app bundle. Importing the `.dmg` on the device therefore can't
+produce a loadable game, and the launcher has no on-device import or certificate screen.
 
 For a launcher-only smoke test, set `FACTORIOS_SIMULATOR_ID` and optionally `FACTORIOS_DERIVED_DATA` in the ignored
 `mise.local.toml`, then run `mise run simulator`. The imported game is device code and its signing and loading gates
@@ -97,7 +97,8 @@ extended addressing.
 This project targets Apple's free, own-device development workflow—not App Store submission. xtool generates the Xcode
 workspace from the Swift package; Xcode performs its standard automatic signing and connected-device installation.
 The converted game is separate executable code, so it must carry a signature from the same certificate as the app;
-`mise run prepare-game` reads that certificate from the built app, and the on-device path needs it as a `.p12`.
+`mise run prepare-game` reads that certificate from the built app, and `mise run device` re-signs the app after
+embedding the library.
 
 ### Device validation
 
@@ -121,8 +122,10 @@ Record the commit, Factorio version, device model, iOS version, signing-team typ
 
 1. Run `mise run device`. Pass when the app installs, the game is copied and, after the developer is trusted, the
    launcher opens on its home screen showing the imported version.
-2. Check the prepared library: `codesign -dv artifact/game/FactoriOS/Converted/factorio.dylib` reports identifier
-   `factorio` and the same `TeamIdentifier` as the app. Record how long the Mac's import, conversion and copy took.
+2. Check the prepared library and its embedded copy: `codesign -dv artifact/game/FactoriOS/Converted/factorio.dylib`
+   and `codesign -dv "$FACTORIOS_DERIVED_DATA/Build/Products/Debug-iphoneos/FactoriOS-App.app/Frameworks/factorio.dylib"`
+   report identifier `factorio` and the same `TeamIdentifier` as the app. Record how long the Mac's import,
+   conversion and copy took.
 3. Open the Factorio folder through the Files app. Pass when it is visible and writable.
 4. Start **Main menu**. Pass the sign/load gate when the converted library passes validation, `dlopen` succeeds and
    Factorio reaches its main function. Preserve both FactoriOS and game logs even on success.

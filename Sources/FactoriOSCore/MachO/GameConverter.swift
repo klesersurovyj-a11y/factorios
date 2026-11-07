@@ -6,8 +6,9 @@ public enum GameConverter {
     static let signatureCommandRoom = 16
 
     /// Converts the arm64 slice of `executable`: retags it for iOS, makes it an `MH_DYLIB`, flattens framework
-    /// paths, weak-links the libraries iOS lacks or trims (and weak-imports their symbols), drops the old code
-    /// signature and records the pointer slots of `options.redirectedSymbols`.
+    /// paths, weak-links the libraries iOS lacks or trims (and weak-imports their symbols), weak-imports every
+    /// redirected symbol so a missing one doesn't stop `dlopen`, drops the old code signature and records the pointer
+    /// slots of `options.redirectedSymbols`.
     public static func convert(executable: Data, options: ConversionOptions) throws -> ConvertedImage {
         let slice = try FatBinary.arm64Slice(of: executable)
         let start = executable.startIndex

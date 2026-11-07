@@ -34,6 +34,33 @@ void FOSCompatSetRestartHandler(void (^handler)(NSArray<NSString *> *arguments))
 /// runs on start-up (setup_macos_application_menu_bar) messages nil, which does nothing.
 static __unsafe_unretained id fosNSApp = nil;
 
+#pragma mark - Foundation: NSAppleEventManager
+
+@implementation FOSAppleEventManager
+
++ (FOSAppleEventManager *)sharedAppleEventManager {
+    static FOSAppleEventManager *manager;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        manager = [[FOSAppleEventManager alloc] init];
+    });
+    return manager;
+}
+
+- (void)setEventHandler:(nullable id)handler
+            andSelector:(SEL)selector
+          forEventClass:(uint32_t)eventClass
+             andEventID:(uint32_t)eventID {
+    // iOS delivers URLs through the scene lifecycle, not Apple Events.
+    (void)handler, (void)selector, (void)eventClass, (void)eventID;
+}
+
+- (void)removeEventHandlerForEventClass:(uint32_t)eventClass andEventID:(uint32_t)eventID {
+    (void)eventClass, (void)eventID;
+}
+
+@end
+
 #pragma mark - ApplicationServices
 
 /// UAZoomEnabled. iOS has no public way to ask whether Zoom is on, so this answers false, and the game keeps its
@@ -242,11 +269,12 @@ static int fos_NSGetExecutablePath(char *buffer, uint32_t *bufferSize) {
 #pragma mark - The table
 
 const FOSSymbolReplacement *FOSCompatReplacements(size_t *count) {
-    static FOSSymbolReplacement table[16];
+    static FOSSymbolReplacement table[17];
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        FOSSymbolReplacement entries[16] = {
+        FOSSymbolReplacement entries[17] = {
             {"_NSApp", (const void *)&fosNSApp},
+            {"_OBJC_CLASS_$_NSAppleEventManager", (__bridge const void *)[FOSAppleEventManager class]},
             {"_OBJC_CLASS_$_NSBitmapImageRep", (__bridge const void *)[FOSBitmapImageRep class]},
             {"_OBJC_CLASS_$_NSColorSpace", (__bridge const void *)[FOSColorSpace class]},
             {"_OBJC_CLASS_$_NSWorkspace", (__bridge const void *)[FOSWorkspace class]},
