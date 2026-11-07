@@ -78,7 +78,7 @@ static BOOL FOSIsStraightRGBA8(CGImageRef image) {
     CGColorSpaceRef space = CGImageGetColorSpace(image);
     CGBitmapInfo info = CGImageGetBitmapInfo(image);
     CGImageAlphaInfo alpha = (CGImageAlphaInfo)(info & kCGBitmapAlphaInfoMask);
-    CGBitmapInfo order = info & kCGBitmapByteOrderMask;
+    CGBitmapInfo order = (CGBitmapInfo)(info & kCGBitmapByteOrderMask);
     BOOL bigEndian = (BOOL)(order == kCGBitmapByteOrderDefault || order == kCGBitmapByteOrder32Big);
     BOOL straight = (BOOL)(alpha == kCGImageAlphaLast || alpha == kCGImageAlphaNoneSkipLast);
     return (BOOL)(space != NULL && CGColorSpaceGetModel(space) == kCGColorSpaceModelRGB &&
@@ -104,7 +104,7 @@ static NSMutableData *_Nullable FOSCopyStraightRGBA8(CGImageRef image) {
     }
     NSMutableData *pixels = [NSMutableData dataWithLength:length];
     const uint8_t *from = CFDataGetBytePtr(source);
-    uint8_t *to = pixels.mutableBytes;
+    uint8_t *to = (uint8_t *)pixels.mutableBytes;
     for (size_t row = 0; row < height; row++) {
         memcpy(to + (row * rowLength), from + (row * stride), rowLength);
     }
@@ -151,7 +151,7 @@ static NSMutableData *_Nullable FOSRenderRGBA8(CGImageRef image, CGColorSpaceRef
     CGContextSetRenderingIntent(context, intent);
     CGContextDrawImage(context, CGRectMake(0, 0, (CGFloat)width, (CGFloat)height), image);
     CGContextRelease(context);
-    FOSUnpremultiply(pixels.mutableBytes, length);
+    FOSUnpremultiply((uint8_t *)pixels.mutableBytes, length);
     return pixels;
 }
 
@@ -219,7 +219,7 @@ static NSMutableData *_Nullable FOSRenderRGBA8(CGImageRef image, CGColorSpaceRef
 }
 
 - (unsigned char *)bitmapData {
-    return _pixels.mutableBytes;
+    return (unsigned char *)_pixels.mutableBytes;
 }
 
 - (NSInteger)bitsPerPixel {
