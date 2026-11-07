@@ -108,6 +108,91 @@ attributes, built with SwiftASN1.
 The pad's geometry, touch handling, layout editing and game gestures live in Core so they compile and lint anywhere;
 the UI only draws them and feeds them touches.
 
+### FactoriOSRuntime
+
+- `Sources/FactoriOSRuntime/AppEntry.swift`: `AppEntry`, `AppEntry.run`
+- `Sources/FactoriOSRuntime/GameInstallation.swift`: `GameInstallation`, `GameInstallation.Stage`, `GameInstallation.install`, `GameInstallation.importSigningIdentity`
+- `Sources/FactoriOSRuntime/LaunchCoordinator.swift`: `LaunchCoordinator`, `LaunchCoordinator.launch`
+- `Sources/FactoriOSRuntime/LibraryBuilder.swift`: `LibraryBuilder`
+- `Sources/FactoriOSRuntime/KeychainSigningIdentity.swift`: `KeychainSigningIdentity`, `SigningPasswordStore`
+- `Sources/FactoriOSRuntime/CertificateSubject.swift`: `CertificateSubject`
+- `Sources/FactoriOSRuntime/SigningIdentityError.swift`: `SigningIdentityError`
+- `Sources/FactoriOSRuntime/CompatTable.swift`: `CompatTable`
+- `Sources/FactoriOSRuntime/GameLoader.swift`: `GameLoader`
+- `Sources/FactoriOSRuntime/GameLaunchError.swift`: `GameLaunchError`
+- `Sources/FactoriOSRuntime/GameSession.swift`: `GameSession`
+- `Sources/FactoriOSRuntime/SDLGameInput.swift`: `SDLGameInput`
+- `Sources/FactoriOSRuntime/RumbleHaptics.swift`: `RumbleHaptics`
+- `Sources/FactoriOSRuntime/RuntimeWindows.swift`: `RuntimeWindows`, `PassthroughWindow`, `RestartPrompt`
+- `Sources/FactoriOSRuntime/RuntimeLog.swift`: `RuntimeLog`
+
+Install: import (detached task) → `GameConverter.convert` with the compat table's symbols → `MachOSigner.sign` with the
+`.p12` identity from the keychain. Launch: `config.ini`; environment (`SDL3_DYNAMIC_API`, `MTL_HUD_ENABLED` for the FPS
+counter, `MTL_DEBUG_LAYER` and `SDL_LOGGING` for detailed logs); stdout and stderr to `Logs/game.log`; Metal fixes;
+`dlopen`; slots filled through `vm_protect`; the overlay window above SDL's window (found through SDL's
+`SDL.window.uikit.window` property, inset by the Frame setting); then the game's `LC_MAIN` entry.
+
+### FactoriOSCompat
+
+- `Sources/FactoriOSCompat/include/FactoriOSCompat.h`: `FOSSymbolReplacement`, `FOSCompatReplacements`, `FOSCompatWriteSlot`, `FOSCompatInstallMetalFixes`, `FOSCompatSetExecutablePath`, `FOSCompatSetRestartHandler`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatSetWindowFrame`
+- `Sources/FactoriOSCompat/include/FOSSDL.h`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLSetMainReady`, `FOSSDLSetHint`, `FOSSDLAttachVirtualGamepad`, `FOSSDLSetGamepadButton`, `FOSSDLSetGamepadAxis`, `FOSSDLWarpMouse`, `FOSSDLScrollWheel`, `FOSSDLSetTextInputActive`, `FOSSDLGameWindow`
+- `Sources/FactoriOSCompat/FOSAppKit.h`: `FOSColorSpace`, `FOSBitmapImageRep`, `FOSWorkspace`
+- `Sources/FactoriOSCompat/FOSImageRep.m`: `FOSColorSpace`, `FOSBitmapImageRep`
+- `Sources/FactoriOSCompat/FOSWorkspace.m`: `FOSWorkspace`
+- `Sources/FactoriOSCompat/FOSReplacements.m`: `FOSCompatReplacements`, `fos_execv`, `fos_fork`, `fos_NSGetExecutablePath`
+- `Sources/FactoriOSCompat/FOSMetalFixes.m`: `FOSCompatInstallMetalFixes`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`
+- `Sources/FactoriOSCompat/FOSSDL.m`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLGameWindow`
+- `Sources/FactoriOSCompat/FOSWindowFrame.m`: `FOSCompatSetWindowFrame`
+
+#### Compatibility map
+
+Every Mac API the game's own code reaches (from `docs/feasibility.md`), and what stands in for it on iOS. Symbol rows
+are filled into the slots the converter recorded; Metal rows change the live Metal classes.
+
+| Mac API | Member | FactoriOS | iOS backing |
+|---|---|---|---|
+| `_NSApp` | `fosNSApp` | `fosNSApp` | a nil object: the game's menu-bar code sends its messages to nil |
+| `NSBitmapImageRep` | `imageRepWithData:` | `FOSBitmapImageRep` | ImageIO decode to 8-bit RGBA |
+| `NSBitmapImageRep` | `bitmapData` | `FOSBitmapImageRep` | the decoded pixel buffer |
+| `NSBitmapImageRep` | `bitsPerPixel` | `FOSBitmapImageRep` | 32 |
+| `NSBitmapImageRep` | `samplesPerPixel` | `FOSBitmapImageRep` | 4 |
+| `NSBitmapImageRep` | `pixelsWide` | `FOSBitmapImageRep` | image width |
+| `NSBitmapImageRep` | `pixelsHigh` | `FOSBitmapImageRep` | image height |
+| `NSBitmapImageRep` | `colorSpace` | `FOSBitmapImageRep` | the image's `FOSColorSpace` |
+| `NSBitmapImageRep` | `bitmapImageRepByConvertingToColorSpace:renderingIntent:` | `FOSBitmapImageRep` | CoreGraphics redraw into the target space |
+| `NSBitmapImageRep` | `bitmapImageRepByRetaggingWithColorSpace:` | `FOSBitmapImageRep` | same pixels, new space |
+| `NSColorSpace` | `sRGBColorSpace` | `FOSColorSpace` | `CGColorSpace` sRGB |
+| `NSColorSpace` | `genericRGBColorSpace` | `FOSColorSpace` | `CGColorSpace` generic RGB |
+| `NSColorSpace` | `CGColorSpace` | `FOSColorSpace` | the wrapped `CGColorSpaceRef` |
+| `NSWorkspace` | `sharedWorkspace` | `FOSWorkspace` | a singleton |
+| `NSWorkspace` | `activateFileViewerSelectingURLs:` | `FOSWorkspace` | opens the folder in Files (`shareddocuments://`) |
+| `_UAZoomEnabled` | `fos_UAZoomEnabled` | `fos_UAZoomEnabled` | `UIAccessibilityIsZoomEnabled` |
+| `_IOPMAssertionCreateWithDescription` | `fos_IOPMAssertionCreateWithDescription` | `fos_IOPMAssertionCreateWithDescription` | `UIApplication.idleTimerDisabled` |
+| `_IOPMAssertionRelease` | `fos_IOPMAssertionRelease` | `fos_IOPMAssertionRelease` | `UIApplication.idleTimerDisabled` |
+| `_clGetPlatformIDs` | `fos_clGetPlatformIDs` | `fos_clGetPlatformIDs` | iOS has no OpenCL: `CL_PLATFORM_NOT_FOUND_KHR` |
+| `_clGetDeviceIDs` | `fos_clGetDeviceIDs` | `fos_clGetDeviceIDs` | no OpenCL: `CL_DEVICE_NOT_FOUND` |
+| `_clGetDeviceInfo` | `fos_clGetDeviceInfo` | `fos_clGetDeviceInfo` | no OpenCL: `CL_INVALID_DEVICE` |
+| `_MTLCopyAllDevices` | `fos_MTLCopyAllDevices` | `fos_MTLCopyAllDevices` | `MTLCreateSystemDefaultDevice` in an array |
+| `_MTLCopyAllDevicesWithObserver` | `fos_MTLCopyAllDevicesWithObserver` | `fos_MTLCopyAllDevicesWithObserver` | the same; iOS's one GPU never changes |
+| `_MTLRemoveDeviceObserver` | `fos_MTLRemoveDeviceObserver` | `fos_MTLRemoveDeviceObserver` | nothing was registered |
+| `_execv` | `fos_execv` | `fos_execv` | restart request: asks the player to reopen FactoriOS |
+| `_fork` | `fos_fork` | `fos_fork` | iOS forbids it: `ENOSYS` |
+| `__NSGetExecutablePath` | `fos_NSGetExecutablePath` | `fos_NSGetExecutablePath` | the imported game's executable path |
+| `MTLDevice` | `newBufferWithLength:options:` | `FOSNewBuffer` | managed storage becomes shared |
+| `MTLDevice` | `newBufferWithBytes:length:options:` | `FOSNewBufferBytes` | managed storage becomes shared |
+| `MTLDevice` | `newBufferWithBytesNoCopy:length:options:deallocator:` | `FOSNewBufferNoCopy` | managed storage becomes shared |
+| `MTLDevice` | `newTextureWithDescriptor:` | `FOSNewTexture` | managed storage becomes shared |
+| `MTLTextureDescriptor` | `setStorageMode:` | `FOSSetStorageMode` | managed storage becomes shared |
+| `MTLTextureDescriptor` | `setResourceOptions:` | `FOSSetResourceOptions` | managed storage becomes shared |
+| `MTLBuffer` | `didModifyRange:` | `FOSBufferDidModifyRange` | nothing to do: unified memory |
+| `MTLBlitCommandEncoder` | `synchronizeResource:` | `FOSBlitSynchronizeResource` | nothing to do: unified memory |
+| `MTLBlitCommandEncoder` | `synchronizeTexture:slice:level:` | `FOSBlitSynchronizeTexture` | nothing to do: unified memory |
+| `MTLDevice` | `isLowPower` | `FOSDeviceIsLowPower` | NO: one GPU |
+| `CAMetalLayer` | `setDisplaySyncEnabled:` | `FOSLayerSetDisplaySyncEnabled` | stored; iOS always syncs |
+| `CAMetalLayer` | `displaySyncEnabled` | `FOSLayerDisplaySyncEnabled` | the stored value |
+| `MTLCommandBuffer` | `presentDrawable:` | `FOSPresentDrawable` | `presentDrawable:afterMinimumDuration:` for the FPS cap |
+| `CAMetalLayer` | `nextDrawable` | `FOSNextDrawable` | waits while the app is in the background |
+
 ### FactoriOSUI
 
 - `Sources/FactoriOSUI/LauncherFactory.swift`: `LauncherFactory`, `LauncherFactory.makeLauncher`, `LauncherFactory.makeOverlay`
