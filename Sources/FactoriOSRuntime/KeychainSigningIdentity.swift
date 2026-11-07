@@ -2,7 +2,7 @@ import FactoriOSCore
 import Foundation
 import Security
 
-/// The sideloading certificate (PKCS#12 exported from SideStore or AltStore) that signs the converted game.
+/// The host app's Apple Development identity, exported from macOS Keychain as PKCS#12.
 ///
 /// The PKCS#12 file lives in `GamePaths.signingIdentity` and its password in the Keychain; Security decodes the file
 /// and holds the private key, which never leaves it.

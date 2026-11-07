@@ -41,18 +41,19 @@ struct WelcomeView: View {
     }
 
     private var certificateStep: some View {
-        StepCard(number: 1, title: "Signing certificate", done: installation.hasSigningIdentity) {
+        StepCard(number: 1, title: "Apple Development identity", done: installation.hasSigningIdentity) {
             Text(
                 """
-                iOS only runs code signed for this device. Export your certificate (.p12) from SideStore or AltStore \
-                and pick it here; FactoriOS signs the game with it.
+                iOS only runs code signed for this device. Export the Apple Development identity used to install \
+                FactoriOS from macOS Keychain as a .p12, then pick it here. FactoriOS signs the game with that same \
+                identity.
                 """
             )
             .font(.callout)
             .foregroundStyle(.secondary)
             CertificateImportButton(
                 installation: installation,
-                title: installation.hasSigningIdentity ? "Replace certificate" : "Import certificate"
+                title: installation.hasSigningIdentity ? "Replace identity" : "Import identity"
             )
         }
     }

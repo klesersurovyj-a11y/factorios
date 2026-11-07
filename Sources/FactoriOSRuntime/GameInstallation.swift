@@ -15,7 +15,7 @@ public final class GameInstallation {
         case importing(ExtractionProgress)
         /// Converting the macOS executable into an iOS library.
         case converting
-        /// Signing the library with the sideloading certificate.
+        /// Signing the library with the Apple Development identity that provisioned the host app.
         case signing
         /// The game is ready to start.
         case ready(ImportedGame)
@@ -25,7 +25,7 @@ public final class GameInstallation {
 
     /// Where the installation stands.
     public private(set) var stage: Stage
-    /// Whether a signing certificate was imported; installing needs one.
+    /// Whether the host app's Apple Development identity was imported; installing needs it.
     public private(set) var hasSigningIdentity: Bool
 
     private let paths: GamePaths
@@ -43,7 +43,7 @@ public final class GameInstallation {
             password != nil && FileManager.default.fileExists(atPath: paths.signingIdentity.path)
     }
 
-    /// Imports the sideloading certificate: checks the password, then keeps the file and its password.
+    /// Imports the host app's Apple Development identity: checks the password, then keeps the file and its password.
     public func importSigningIdentity(from p12: URL, password: String) throws {
         let scoped = p12.startAccessingSecurityScopedResource()
         defer {

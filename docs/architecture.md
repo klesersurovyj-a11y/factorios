@@ -27,7 +27,7 @@ sequenceDiagram
     L->>R: GameInstallation.install(from:)
     R->>C: GameImporter (UDIF → bzip2 → HFS+ → factorio.app)
     R->>C: GameConverter (arm64 slice → iOS dylib + slot manifest)
-    R->>C: MachOSigner (CodeDirectory + CMS with the sideloading certificate)
+    R->>C: MachOSigner (CodeDirectory + CMS with the host app's Apple Development identity)
     P->>L: Continue / Main menu
     L->>R: LaunchCoordinator.launch(_:)
     R->>R: config.ini, SDL3_DYNAMIC_API, dlopen, fill compat slots, Metal fixes
@@ -78,9 +78,9 @@ recorded.
 
 ### FactoriOSCore: code signing
 
-A real embedded signature, made on the device with the sideloading certificate: CodeDirectory 0x20400 (SHA-256, 4 KiB
-pages), empty requirements, optional entitlements (XML and DER), and a detached CMS SignedData with Apple's CDHash
-attributes, built with SwiftASN1.
+A real embedded signature, made on the device with the Apple Development identity that provisioned FactoriOS:
+CodeDirectory 0x20400 (SHA-256, 4 KiB pages), empty requirements, optional entitlements (XML and DER), and a detached
+CMS SignedData with Apple's CDHash attributes, built with SwiftASN1.
 
 - `Sources/FactoriOSCore/CodeSigning/SigningIdentity.swift`: `SigningIdentity`
 - `Sources/FactoriOSCore/CodeSigning/MachOSigner.swift`: `MachOSigner`, `MachOSigner.sign`
@@ -234,7 +234,7 @@ they prove nothing about behaviour. Each item is **deferred, not verified**:
 |---|---|
 | Build | xtool builds the package for iOS: FactoriOSCompat, FactoriOSRuntime and FactoriOSUI have never been compiled, only written against the iOS 17 SDK. |
 | Import | A full import on the device (memory, time, Files app visibility of the Factorio folder). Hard links, the extents overflow tree and compressed files were absent from the demo image, so those paths have never run on real data. |
-| Signing | The converted library, signed on the device with a free Apple ID's certificate, passes library validation and `dlopen`s (feasibility gate 1). |
+| Signing | The converted library, signed with the Personal Team Apple Development identity that provisioned FactoriOS, passes library validation and `dlopen`s (feasibility gate 1). |
 | Loading | dyld accepts a macOS binary retagged as iOS; weak imports from missing frameworks resolve to zero; the slots fill. |
 | SDL | The game's static SDL3 forwards to the bundled SDL3, and SDL's window, touch, audio and controllers work with the game's entry point running inside SDL's main callback (gate 2). |
 | Metal | The 110 shaders compile on iOS; rendering with managed storage turned into shared storage; the frame-rate cap and background frame gate (gate 3). |

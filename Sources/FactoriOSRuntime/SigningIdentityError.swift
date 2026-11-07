@@ -1,6 +1,6 @@
 import Foundation
 
-/// Why the sideloading certificate couldn't be imported or used.
+/// Why the Apple Development identity couldn't be imported or used.
 enum SigningIdentityError: Error, LocalizedError, Equatable {
     /// No certificate was imported yet.
     case notImported
@@ -22,7 +22,7 @@ enum SigningIdentityError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notImported:
-            "Import the signing certificate (.p12) from SideStore or AltStore first."
+            "Import the Apple Development identity (.p12) used to provision FactoriOS first."
         case .wrongPassword:
             "The certificate's password is wrong."
         case .unreadable(let status):

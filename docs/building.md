@@ -64,9 +64,24 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
 3. **Build and install:** `xtool dev` with an iPhone or iPad connected (on WSL, pass USB through with `usbipd`).
 
 `xtool.yml` names the bundle (`app.factorios`), `Resources/Info.plist` adds landscape, Files app sharing and game
-controller keys, and the default `Resources/FactoriOS.entitlements` is empty so a free Apple ID can provision it.
-If device testing proves the normal memory allowance insufficient and the signing team has the capabilities, point
-`entitlementsPath` at `Resources/FactoriOS.memory.entitlements` to request increased memory and extended addressing.
+controller keys, and the default `Resources/FactoriOS.entitlements` is empty so an Apple Account's Personal Team can
+provision it. If device testing proves the normal memory allowance insufficient and the signing team has the
+capabilities, point `entitlementsPath` at `Resources/FactoriOS.memory.entitlements` to request increased memory and
+extended addressing.
+
+### Personal Team provisioning
+
+This project targets Apple's free, own-device development workflow—not App Store submission:
+
+1. Let Xcode or xtool create the Personal Team provisioning profile and install FactoriOS on the registered device.
+2. On the Mac, export the **same Apple Development identity**, including its private key, from Keychain Access as a
+   password-protected `.p12`.
+3. Import that `.p12` in FactoriOS. The converted game is separate executable code, so it must carry a valid embedded
+   signature from the same identity before iOS can load it.
+
+Apple's [membership comparison](https://developer.apple.com/support/compare-memberships) distinguishes this free
+on-device testing path from App Store/TestFlight distribution, which requires paid Developer Program membership.
+Even with paid membership, the current imported-code runtime is not App Store eligible under review guideline 2.5.2.
 
 `scripts/make-icon` redraws `Resources/AppIcon.png`.
 

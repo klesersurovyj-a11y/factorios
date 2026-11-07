@@ -37,7 +37,7 @@ struct HomeView: View {
                     .foregroundStyle(.red)
             }
             if !installation.hasSigningIdentity {
-                Label("No signing certificate: import it again in Settings.", systemImage: "checkmark.seal")
+                Label("No Apple Development identity: import it again in Settings.", systemImage: "checkmark.seal")
                     .font(.callout)
                     .foregroundStyle(.orange)
             }

@@ -1,9 +1,9 @@
 # FactoriOS
 
 Play your own copy of Factorio on an iPhone or iPad. FactoriOS imports the **macOS** build you download from
-factorio.com, turns it into a library iOS can load, signs it on the device with your sideloading certificate and runs it
-natively, with SDL3 for iOS underneath and a small compatibility layer for the few Mac-only APIs the game uses. No
-emulation, no streaming, and none of the game's files in the app.
+factorio.com, turns it into a library iOS can load, signs it with the same Apple Development identity used to provision
+FactoriOS, and runs it natively. SDL3 for iOS and a small compatibility layer replace the few Mac-only APIs the game
+uses. No emulation, no streaming, and none of the game's files in the app.
 
 **Status: written, not yet run.** Nothing here has run on a device. `docs/architecture.md` lists exactly what remains
 to be verified there.
@@ -28,11 +28,15 @@ flowchart LR
 
 ## Requirements
 
-- An arm64 iPhone or iPad on iOS 17 or later, sideloaded with SideStore, AltStore or xtool and a free Apple ID.
-  Which device generations can run the game within their CPU and memory limits remains a device-test gate.
+- An arm64 iPhone or iPad on iOS 17 or later, installed to your own device with Xcode or xtool using a free Apple
+  developer account (Personal Team). Which device generations can run the game within their CPU and memory limits
+  remains a device-test gate.
 - Factorio for macOS from [factorio.com/download](https://factorio.com/download) (the demo works too).
-- The sideloading tool's signing certificate, exported as a `.p12` file, which FactoriOS uses to sign the converted
-  game on the device.
+- The Personal Team's Apple Development identity exported from macOS Keychain as a password-protected `.p12`.
+  FactoriOS uses the same identity to sign the converted game library.
+
+This is Apple's personal development provisioning path, not App Store or TestFlight distribution. Public distribution
+requires paid Developer Program membership, and the current imported-code runtime is not App Store eligible.
 
 ## Factorio
 

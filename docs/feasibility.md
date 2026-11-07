@@ -198,10 +198,10 @@ header->flags &= ~MH_PIE;
 ```
 
 Its README: "(Below iOS 26) When JIT is available, codesign is entirely bypassed ... Otherwise, your app will be signed
-with the same certificate used by LiveContainer", and "In JIT-less mode, all executables are signed". That's the mode
-FactoriOS uses: no JIT, every converted library signed on the device with the sideloading certificate. LiveContainer's
-guests are iOS binaries; FactoriOS's is a macOS binary retagged for iOS (`LC_BUILD_VERSION`), which dyld otherwise
-refuses to load into an iOS process **[inference]**.
+with the same certificate used by LiveContainer", and "In JIT-less mode, all executables are signed". FactoriOS also
+uses no JIT: every converted library is signed with the same Apple Development identity that provisioned the host app.
+LiveContainer's guests are iOS binaries; FactoriOS's is a macOS binary retagged for iOS (`LC_BUILD_VERSION`), which
+dyld otherwise refuses to load into an iOS process **[inference]**.
 
 LiveContainer is AGPL-3.0. FactoriOS uses it only as a cited behavioral precedent; the converter and signer here are
 independent implementations from Mach-O and code-signing formats, with no LiveContainer or ZSign source copied.
@@ -209,8 +209,9 @@ FactoriOS itself has no granted license yet; choose and add one before distribut
 
 ## Gates only a device can close
 
-1. **Sign and load.** A 226 MB library converted and signed on the device with a free Apple ID's certificate passes
-   library validation and `dlopen`s. LiveContainer's JIT-less mode is the precedent; the macOS-to-iOS retag is new.
+1. **Sign and load.** A 226 MB library converted and signed on the device with the host app's Personal Team Apple
+   Development identity passes library validation and `dlopen`s. LiveContainer's JIT-less mode is the precedent; the
+   macOS-to-iOS retag is new.
 2. **SDL hand-over and lifecycle.** The game's static SDL3 forwards to FactoriOS's SDL3, and the UIKit window, Metal
    layer, touch and audio work when the game's entry point runs inside SDL's `postFinishLaunch`.
 3. **Metal.** The 110 shaders compile on iOS's Metal compiler, and the game renders with managed storage turned into

@@ -113,7 +113,7 @@ struct SettingsView: View {
             } label: {
                 Label("Open the Factorio folder in Files", systemImage: "folder")
             }
-            CertificateImportButton(installation: installation, title: "Import signing certificate again")
+            CertificateImportButton(installation: installation, title: "Import Apple Development identity again")
             GameImportButton(installation: installation, title: "Import Factorio again")
         } header: {
             Text("Files")
@@ -121,7 +121,7 @@ struct SettingsView: View {
             Text(
                 """
                 The Factorio folder holds your saves, mods, config and scenarios; mod changes apply the next time \
-                the game starts. Import Factorio again for a new version, or after renewing the certificate.
+                the game starts. Import Factorio again for a new version, or after renewing the development identity.
                 """
             )
         }

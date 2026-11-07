@@ -67,6 +67,6 @@ public struct GamePaths: Sendable, Equatable {
     public var settingsFile: URL { support.appendingPathComponent("settings.json") }
     /// The on-screen controller layout.
     public var padLayoutFile: URL { support.appendingPathComponent("pad-layout.json") }
-    /// The signing certificate imported from the sideloading tool, as PKCS#12.
+    /// The host app's Apple Development identity, exported as PKCS#12.
     public var signingIdentity: URL { support.appendingPathComponent("Signing/identity.p12") }
 }
