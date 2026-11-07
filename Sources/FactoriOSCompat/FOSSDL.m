@@ -111,11 +111,8 @@ static NSError *FOSSDLMakeError(NSInteger code, NSString *message) {
     return [NSError errorWithDomain:FOSSDLErrorDomain code:code userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
-/// Converts a nullable C string without allowing invalid UTF-8 to escape as a nullable NSString.
-static NSString *FOSStringFromUTF8(const char *_Nullable bytes) {
-    if (bytes == NULL) {
-        return @"";
-    }
+/// Converts a C string without allowing invalid UTF-8 to escape as a nullable NSString.
+static NSString *FOSStringFromUTF8(const char *bytes) {
     NSString *string = [NSString stringWithUTF8String:bytes];
     return string != nil ? string : @"";
 }
@@ -204,7 +201,7 @@ BOOL FOSSDLSetHint(NSString *name, NSString *value) {
 
 NSString *FOSSDLLastError(void) {
     const char *message = fosSDL.GetError();
-    return FOSStringFromUTF8(message);
+    return message != NULL ? FOSStringFromUTF8(message) : @"";
 }
 
 /// SDL_VirtualJoystickDesc.Rumble: forwards SDL's 16-bit strengths to the handler as 0...1.
