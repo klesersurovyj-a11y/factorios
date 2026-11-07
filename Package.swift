@@ -11,8 +11,9 @@ let strictSwift: [SwiftSetting] = [
 let strictObjC: [CSetting] = [
     .unsafeFlags([
         "-Werror", "-Weverything",
-        "-Wno-declaration-after-statement", "-Wno-padded", "-Wno-poison-system-directories",
-        "-Wno-objc-messaging-id", "-Wno-direct-ivar-access", "-Wno-unsafe-buffer-usage",
+        "-Wno-declaration-after-statement", "-Wno-missing-include-dirs", "-Wno-padded",
+        "-Wno-poison-system-directories", "-Wno-objc-messaging-id", "-Wno-direct-ivar-access",
+        "-Wno-unsafe-buffer-usage",
         "-Wno-pre-c11-compat", "-Wno-switch-default",
     ])
 ]
