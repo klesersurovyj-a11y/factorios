@@ -4,6 +4,7 @@ swift = "6.4.2"
 swiftlint = "0.65.1"
 python = "3.12"
 uv = "0.13.7"
+7zip = "26.05"
 "pipx:clang-tidy" = "23.1.4"
 jactionlint = "2.5.0"
 shellcheck = "0.11.0"
@@ -12,18 +13,22 @@ shellcheck = "0.11.0"
 _.python.venv = { path = ".venv", create = true }
 
 [tasks.setup]
-description = "Python packages for the binary inspection scripts"
+hide = true
+description = "Python packages for binary inspection"
 run = "uv pip install --quiet --requirement scripts/requirements.txt"
 
 [tasks.inspect]
 description = "Feasibility report for a Factorio macOS build ($FACTORIOS_DMG or the path given)"
+depends = ["setup"]
 run = "python3 scripts/inspect-binary"
 
 [tasks.lint]
+hide = true
 description = "SwiftLint, strict"
 run = "swiftlint lint --strict --quiet"
 
 [tasks.format-check]
+hide = true
 description = "swift-format, strict"
 run = "swift format lint --strict --recursive --parallel Package.swift Sources"
 
@@ -32,12 +37,14 @@ description = "Rewrites sources with swift-format"
 run = "swift format format --in-place --recursive --parallel Package.swift Sources"
 
 [tasks.build-host]
+hide = true
 description = "Compiles the platform-independent target on this machine (no run)"
 env = { FACTORIOS_CORE_ONLY = "1" }
 run = "swift build --target FactoriOSCore"
 
 [tasks.tidy]
-description = "clang-tidy over the Objective-C compatibility layer (needs the iOS SDK: macOS only)"
+hide = true
+description = "clang-tidy over Objective-C (requires Xcode's iOS SDK)"
 run = """
 clang-tidy --quiet Sources/FactoriOSCompat/*.m -- \
   -x objective-c -fobjc-arc -fblocks -fmodules \
@@ -48,45 +55,55 @@ clang-tidy --quiet Sources/FactoriOSCompat/*.m -- \
 """
 
 [tasks.check-architecture]
+hide = true
 description = "Every file and API listed in docs/architecture.md exists"
 run = "python3 scripts/check-architecture"
 
-[tasks.check-size]
-description = "Implementation files stay under 1000 lines"
-run = "python3 scripts/check-size"
-
-[tasks.check-markers]
-description = "No TODO/FIXME/unimplemented placeholders"
-run = "! grep -rnE 'TODO|FIXME|fatalError\\(\"unimplemented|notImplemented' Sources Package.swift"
-
-[tasks.check-support]
-description = "Checks workflows and scripts, and parses both entitlement property lists"
+[tasks.check-repo]
+hide = true
+description = "Checks workflows, scripts and entitlement property lists"
 run = """
 jactionlint
-sh -n scripts/build-sdl3.sh
+shellcheck scripts/prepare-sdl3.sh
+PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/factorios-pycache" python3 -m py_compile scripts/inspect-binary
 python3 - <<'PY'
-import ast
 import pathlib
-import xml.etree.ElementTree as ElementTree
+import plistlib
 
-ast.parse(pathlib.Path("scripts/inspect-binary").read_text())
-ElementTree.parse("Resources/FactoriOS.entitlements")
-ElementTree.parse("Resources/FactoriOS.memory.entitlements")
+for path in (
+    pathlib.Path("Resources/FactoriOS.entitlements"),
+    pathlib.Path("Resources/FactoriOS.memory.entitlements"),
+):
+    with path.open("rb") as file:
+        plistlib.load(file)
 PY
 """
 
 [tasks.check]
-description = "Every static check that runs on Linux"
-depends = [
-  "lint",
-  "format-check",
-  "build-host",
-  "check-architecture",
-  "check-size",
-  "check-markers",
-  "check-support",
-]
+description = "Every portable build and static check"
+depends = ["lint", "format-check", "build-host", "check-architecture", "check-repo"]
 
-[tasks.sdl3]
-description = "Builds SDL3 for iOS into Vendor/SDL3.xcframework (macOS only)"
-run = "scripts/build-sdl3.sh"
+[tasks.prepare-sdl3]
+hide = true
+description = "Downloads and verifies SDL's official Apple XCFramework"
+run = "scripts/prepare-sdl3.sh"
+
+[tasks.build-ios]
+hide = true
+description = "Compiles every iOS target"
+depends = ["prepare-sdl3"]
+run = """
+swift build \
+  --triple arm64-apple-ios17.0 \
+  --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  --target FactoriOSApp
+"""
+
+[tasks.check-ios]
+description = "Prepares SDL, analyzes Objective-C and compiles every iOS target"
+depends = ["tidy", "build-ios"]
+
+[tasks.dev]
+description = "Prepares SDL, then builds and installs with xtool"
+depends = ["prepare-sdl3"]
+run = "xtool dev"

@@ -32,8 +32,8 @@ let core: Target = .target(
 // sees every target.
 let coreOnly = Context.environment["FACTORIOS_CORE_ONLY"] != nil
 
-// SDL3 for iOS, built by `mise run sdl3` on a Mac. xtool embeds binary targets in the app's Frameworks directory,
-// where the game's static SDL3 finds it through SDL3_DYNAMIC_API.
+// SDL3's official, pinned Apple XCFramework is prepared by the iOS build and dev tasks. xtool embeds the binary target
+// in the app's Frameworks directory, where the game's static SDL3 finds it through SDL3_DYNAMIC_API.
 let appleTargets: [Target] =
     coreOnly
     ? []

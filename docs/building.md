@@ -7,44 +7,37 @@ or macOS. Tools are pinned with [mise](https://mise.jdx.dev): `mise.toml` holds 
 ## Tools
 
 ```sh
-mise install          # Swift 6.4.2 (with swift-format), SwiftLint, Python, uv, clang-tidy
-mise run setup        # Python packages for scripts/inspect-binary (LIEF, NumPy)
+mise install  # Swift, SwiftLint, Python, uv, 7-Zip, clang-tidy and repository linters
 ```
 
-A Linux or WSL machine also wants 7-Zip, for reading disk images, and the path of a Factorio disk image. Its
-`mise.local.toml`:
+`mise run inspect` installs its pinned Python packages when needed. A Linux or WSL machine can put the Factorio disk
+image path in its uncommitted `mise.local.toml`:
 
 ```toml
-[tools]
-7zip = "latest"
-
 [env]
 FACTORIOS_DMG = "/path/to/factorio_mac.dmg"
 ```
 
 ## Checks
 
-| Command | What it checks | Where it runs |
+| Command | What it does | Where it runs |
 |---|---|---|
-| `mise run check` | everything below except `tidy` | anywhere |
-| `mise run lint` | SwiftLint, every opt-in rule, warnings as errors; cyclomatic complexity ≤ 15, files < 1000 lines | anywhere |
-| `mise run format-check` | swift-format, strict | anywhere |
-| `mise run build-host` | compiles `FactoriOSCore` (disk image, Mach-O, signing, settings) | anywhere |
-| `mise run check-architecture` | every file, API and compatibility entry in `docs/architecture.md` exists | anywhere |
-| `mise run check-size` | no implementation file reaches 1000 lines | anywhere |
-| `mise run check-markers` | no TODO, FIXME or unimplemented placeholders | anywhere |
-| `mise run tidy` | clang-tidy over the Objective-C compatibility layer | macOS (needs the iOS SDK) |
+| `mise run check` | SwiftLint, swift-format, repository/documentation checks and the `FactoriOSCore` build | anywhere |
+| `mise run check-ios` | obtains pinned SDL3, runs clang-tidy and compiles every iOS target | macOS with Xcode |
+| `mise run format` | rewrites Swift sources with swift-format | anywhere |
+| `mise run inspect` | analyzes the configured Factorio build, installing its Python dependencies first | Linux, WSL or macOS |
+| `mise run dev` | obtains pinned SDL3, then builds and installs through xtool | an xtool development machine |
 
-`build-host` sets `FACTORIOS_CORE_ONLY`, which hides the iOS-only targets from the package so the host's own Swift
-can compile the core.
+`check` sets `FACTORIOS_CORE_ONLY` for its host build, which hides the iOS-only targets. `check-ios` needs Xcode's iOS
+SDK because clang-tidy and the cross-compile resolve UIKit, Metal and the Objective-C runtime through that SDK.
 
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push and pull request:
 
-- Ubuntu installs the pinned mise toolchain, builds `FactoriOSCore`, and runs every task in `mise run check`.
-- macOS builds the pinned SDL3 XCFramework, runs clang-tidy against the iOS SDK, and compiles `FactoriOSApp` for
-  `arm64-apple-ios17.0`.
+- Ubuntu installs the pinned mise toolchain and runs `mise run check`.
+- macOS runs `mise run check-ios`, which obtains SDL3, analyzes Objective-C against the iOS SDK and compiles
+  `FactoriOSApp` for `arm64-apple-ios17.0`.
 
 Actions are pinned by commit SHA, workflow permissions are read-only, duplicate runs are cancelled, and both jobs
 have timeouts. Binary feasibility inspection is not a CI step because the proprietary Factorio disk image is
@@ -52,16 +45,16 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
 
 ## The app
 
-1. **SDL3 for iOS**, once (macOS with Xcode and CMake): `mise run sdl3` builds `Vendor/SDL3.xcframework`
-   from SDL 3.4.20 at pinned commit `f00dc919ca35b9756316e86c4777392de442f9b2`. `Package.swift` requires it;
-   xtool embeds it in `FactoriOS.app/Frameworks`. SDL's
-   [dynamic API contract](https://wiki.libsdl.org/SDL3/README-dynapi) keeps the table order stable, appends new
-   entries, and rejects a caller whose table is larger or whose table version differs. That rejection remains part of
-   the SDL device gate.
+1. **SDL3 for iOS:** the iOS build and development tasks download SDL 3.4.20's official release DMG, verify its pinned
+   SHA-256 digest and extract `SDL3.xcframework` into the ignored `Vendor` directory. This works on Linux, WSL and
+   macOS; it does not require a local SDL source build. `Package.swift` embeds that framework in the app. SDL's
+   [dynamic API contract](https://wiki.libsdl.org/SDL3/README-dynapi) keeps the table order stable, appends new entries,
+   and rejects a caller whose table is larger or whose table version differs. That rejection remains part of the SDL
+   device gate.
 2. **xtool:** install it and its iOS SDK by following
    [xtool's guide](https://xtool.sh/documentation/xtool/installation-linux) (`xtool setup`; on macOS Xcode provides the
    SDK).
-3. **Build and install:** `xtool dev` with an iPhone or iPad connected (on WSL, pass USB through with `usbipd`).
+3. **Build and install:** run `mise run dev` with an iPhone or iPad connected (on WSL, pass USB through with `usbipd`).
 
 `xtool.yml` names the bundle (`app.factorios`), `Resources/Info.plist` adds landscape, Files app sharing and game
 controller keys, and the default `Resources/FactoriOS.entitlements` is empty so an Apple Account's Personal Team can
@@ -74,8 +67,8 @@ extended addressing.
 This project targets Apple's free, own-device development workflow—not App Store submission. The supported app
 packager is xtool; this repository does not yet provide an Xcode app project or installable scheme.
 
-1. `xtool dev` creates the Personal Team provisioning profile, signs FactoriOS, and installs it on the registered
-   device.
+1. `mise run dev` invokes xtool, which creates the Personal Team provisioning profile, signs FactoriOS and installs it
+   on the registered device.
 2. FactoriOS needs the **same Apple Development identity**, including its private key, as a password-protected `.p12`
    so it can sign the imported game. Stable xtool does not currently document this export; implementing and verifying
    that identity handoff is a setup gate before device testing. A separately generated Xcode identity is not valid.
@@ -93,7 +86,7 @@ this procedure passes. The four decisive runtime gates and the full verification
 
 - A green CI run for the commit under test.
 - An arm64 iPhone or iPad on iOS 17 or later, registered with the signing account and visible to xtool.
-- xtool configured with an iOS SDK, the pinned SDL3 framework built by `mise run sdl3`, and the demo `.dmg`.
+- xtool configured with an iOS SDK, the demo `.dmg`, and the pinned toolchain installed by `mise install`.
 - The exact Apple Development identity and private key used by `xtool dev`, exported as a password-protected `.p12`.
   This export is still unresolved in stable xtool. Stop here until a reproducible export method exists; a different
   identity cannot establish whether library validation works.
@@ -102,7 +95,7 @@ Record the commit, Factorio version, device model, iOS version, signing-team typ
 
 #### Procedure
 
-1. Run `xtool dev`. Pass when installation succeeds and the launcher opens without terminating.
+1. Run `mise run dev`. Pass when installation succeeds and the launcher opens without terminating.
 2. Import the matching `.p12`. Pass when FactoriOS accepts its password and reports that the signing identity is
    available.
 3. Import the demo `.dmg`. Record the duration and final installation stage. Pass when extraction, conversion and
@@ -133,7 +126,6 @@ device.
 The free path provides no App Store Connect or TestFlight access. Paid Developer Program membership enables those
 distribution services, but the current imported-code runtime remains ineligible under App Review guideline 2.5.2.
 
-`scripts/make-icon` redraws `Resources/AppIcon.png`.
 
 ## Inspecting a Factorio build
 
