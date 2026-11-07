@@ -4,10 +4,19 @@ swift = "6.4.2"
 swiftlint = "0.65.1"
 python = "3.12"
 uv = "0.13.7"
-7zip = "26.05"
+"aqua:ip7z/7zip" = "26.05"
 "pipx:clang-tidy" = "23.1.4"
-jactionlint = "2.5.0"
+"github:jdx/jactionlint" = "2.5.0"
 shellcheck = "0.11.0"
+
+[tools."github:xtool-org/xtool"]
+version = "1.24.0"
+
+[tools."github:xtool-org/xtool".platforms]
+linux-arm64 = { asset_pattern = "xtool-aarch64.AppImage", format = "raw", bin = "xtool" }
+linux-x64 = { asset_pattern = "xtool-x86_64.AppImage", format = "raw", bin = "xtool" }
+macos-arm64 = { asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
+macos-x64 = { asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
 
 [env]
 _.python.venv = { path = ".venv", create = true }
@@ -107,3 +116,8 @@ depends = ["tidy", "build-ios"]
 description = "Prepares SDL, then builds and installs with xtool"
 depends = ["prepare-sdl3"]
 run = "xtool dev"
+
+[tasks.xcode-project]
+description = "Prepares SDL, then generates the Xcode workspace"
+depends = ["prepare-sdl3"]
+run = "xtool dev generate-xcode-project"

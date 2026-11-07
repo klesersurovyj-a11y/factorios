@@ -28,16 +28,16 @@ flowchart LR
 
 ## Requirements
 
-- An arm64 iPhone or iPad on iOS 17 or later, installed to your own device with xtool using a free Apple developer
-  account (Personal Team). Which device generations can run the game within their CPU and memory limits remains a
-  device-test gate.
+- An arm64 iPhone or iPad on iOS 17 or later, connected to a Mac with Xcode and installed through the developer's
+  Personal Team. Which device generations can run the game within their CPU and memory limits remains a device-test
+  gate.
 - Factorio for macOS from [factorio.com/download](https://factorio.com/download) (the demo works too).
-- The exact Apple Development identity xtool uses to provision FactoriOS, exported as a password-protected `.p12`.
-  The identity handoff from xtool is still a setup gate; do not substitute a second certificate.
+- The exact `Apple Development` identity Xcode used to sign FactoriOS, exported with its private key as a
+  password-protected `.p12`.
 
-This is Apple's personal development provisioning path, not App Store or TestFlight distribution. The repository
-currently packages the app with xtool; it does not contain an Xcode app project or installable Xcode scheme. Public
-distribution requires paid Developer Program membership, and the imported-code runtime is not App Store eligible.
+This is Apple's developer-owned, connected-device workflow, not App Store or TestFlight distribution. xtool generates
+the Xcode workspace from the Swift package; Xcode performs automatic signing and installation. The imported-code
+runtime is not App Store eligible.
 
 ## Factorio
 

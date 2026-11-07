@@ -232,8 +232,8 @@ checks, but that proves no device behaviour. Each item is **deferred, not verifi
 
 | Area | What has to be seen on a device |
 |---|---|
-| Build and install | xtool packages, signs and installs FactoriOS, and the launcher opens on an iOS 17 or later device. |
-| Provisioning | xtool's exact Apple Development identity and private key can be handed to FactoriOS as PKCS#12; stable xtool does not currently document that export. |
+| Build and install | The generated Xcode workspace builds, signs and installs FactoriOS, and the launcher opens on an iOS 17 or later device. |
+| Provisioning | The exact Xcode-managed Apple Development identity and private key can be exported through Keychain Access as PKCS#12, and FactoriOS accepts it. |
 | Import | A full import on the device (memory, time, Files app visibility of the Factorio folder). Hard links, the extents overflow tree and compressed files were absent from the demo image, so those paths have never run on real data. |
 | Signing | The converted library, signed with the Personal Team Apple Development identity that provisioned FactoriOS, passes library validation and `dlopen`s (feasibility gate 1). |
 | Loading | dyld accepts a macOS binary retagged as iOS; weak imports from missing frameworks resolve to zero; the slots fill. |

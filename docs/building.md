@@ -7,8 +7,11 @@ or macOS. Tools are pinned with [mise](https://mise.jdx.dev): `mise.toml` holds 
 ## Tools
 
 ```sh
-mise install  # Swift, SwiftLint, Python, uv, 7-Zip, clang-tidy and repository linters
+mise install  # Swift, SwiftLint, Python, uv, 7-Zip, clang-tidy, xtool and repository linters
 ```
+
+On macOS, a device build also needs the full Xcode application, launched once to finish installing the iOS SDK.
+Selecting Command Line Tools alone is not sufficient. `xcrun --sdk iphoneos --show-sdk-path` verifies the active SDK.
 
 `mise run inspect` installs its pinned Python packages when needed. A Linux or WSL machine can put the Factorio disk
 image path in its uncommitted `mise.local.toml`:
@@ -26,7 +29,8 @@ FACTORIOS_DMG = "/path/to/factorio_mac.dmg"
 | `mise run check-ios` | obtains pinned SDL3, runs clang-tidy and compiles every iOS target | macOS with Xcode |
 | `mise run format` | rewrites Swift sources with swift-format | anywhere |
 | `mise run inspect` | analyzes the configured Factorio build, installing its Python dependencies first | Linux, WSL or macOS |
-| `mise run dev` | obtains pinned SDL3, then builds and installs through xtool | an xtool development machine |
+| `mise run xcode-project` | generates `xtool/FactoriOS.xcworkspace` for Xcode-managed signing and installation | macOS with Xcode |
+| `mise run dev` | builds, signs and installs directly through xtool | an xtool development machine |
 
 `check` sets `FACTORIOS_CORE_ONLY` for its host build, which hides the iOS-only targets. `check-ios` needs Xcode's iOS
 SDK because clang-tidy and the cross-compile resolve UIKit, Metal and the Objective-C runtime through that SDK.
@@ -51,10 +55,21 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
    [dynamic API contract](https://wiki.libsdl.org/SDL3/README-dynapi) keeps the table order stable, appends new entries,
    and rejects a caller whose table is larger or whose table version differs. That rejection remains part of the SDL
    device gate.
-2. **xtool:** install it and its iOS SDK by following
-   [xtool's guide](https://xtool.sh/documentation/xtool/installation-linux) (`xtool setup`; on macOS Xcode provides the
-   SDK).
-3. **Build and install:** run `mise run dev` with an iPhone or iPad connected (on WSL, pass USB through with `usbipd`).
+2. **Generate the workspace:** on macOS, run `mise run xcode-project`, then open
+   `xtool/FactoriOS.xcworkspace`. The generated workspace is disposable and ignored; regenerate it after package or
+   packaging changes.
+3. **Build and install:** in Xcode, add the developer's Apple Account, select the Personal Team for the
+   `FactoriOSApp` target, select the connected and trusted iPhone or iPad, and press Run. Xcode creates the development
+   certificate and device provisioning profile and installs the app directly. This project targets developer-owned
+   devices; it does not need an exported IPA, TestFlight or an App Store workflow.
+4. **Export the matching identity:** in Keychain Access, export the `Apple Development` identity Xcode used—certificate
+   and private key—as a password-protected `.p12`. Transfer that file to the device and import it in FactoriOS. The
+   converted game is separate executable code and must be signed with the same identity as the host app.
+
+Linux and WSL developers can instead use `mise run dev` after completing
+[xtool's setup](https://xtool.sh/documentation/xtool/installation-linux), but must obtain the exact identity xtool used
+for signing; the Xcode workflow is the supported macOS path because its identity is exportable through Keychain
+Access.
 
 `xtool.yml` names the bundle (`app.factorios`), `Resources/Info.plist` adds landscape, Files app sharing and game
 controller keys, and the default `Resources/FactoriOS.entitlements` is empty so an Apple Account's Personal Team can
@@ -64,16 +79,14 @@ extended addressing.
 
 ### Personal Team provisioning
 
-This project targets Apple's free, own-device development workflow—not App Store submission. The supported app
-packager is xtool; this repository does not yet provide an Xcode app project or installable scheme.
+This project targets Apple's free, own-device development workflow—not App Store submission. xtool generates the Xcode
+workspace from the Swift package; Xcode performs its standard automatic signing and connected-device installation.
 
-1. `mise run dev` invokes xtool, which creates the Personal Team provisioning profile, signs FactoriOS and installs it
-   on the registered device.
-2. FactoriOS needs the **same Apple Development identity**, including its private key, as a password-protected `.p12`
-   so it can sign the imported game. Stable xtool does not currently document this export; implementing and verifying
-   that identity handoff is a setup gate before device testing. A separately generated Xcode identity is not valid.
-3. Import that `.p12` in FactoriOS. The converted game is separate executable code, so it must carry a valid embedded
-   signature from the host's identity before iOS can load it.
+1. Run `mise run xcode-project`, open `xtool/FactoriOS.xcworkspace`, select the Personal Team and run on the device.
+2. In Keychain Access, find the `Apple Development` certificate whose private key is nested beneath it and whose team
+   matches Xcode's signing setting. Export both together as a password-protected `.p12`.
+3. Import that `.p12` in FactoriOS before importing Factorio. A different development certificate—even for the same
+   account—will not satisfy library validation.
 
 ### Device validation
 
@@ -85,17 +98,17 @@ this procedure passes. The four decisive runtime gates and the full verification
 #### Prerequisites
 
 - A green CI run for the commit under test.
-- An arm64 iPhone or iPad on iOS 17 or later, registered with the signing account and visible to xtool.
-- xtool configured with an iOS SDK, the demo `.dmg`, and the pinned toolchain installed by `mise install`.
-- The exact Apple Development identity and private key used by `xtool dev`, exported as a password-protected `.p12`.
-  This export is still unresolved in stable xtool. Stop here until a reproducible export method exists; a different
-  identity cannot establish whether library validation works.
+- An arm64 iPhone or iPad on iOS 17 or later, connected, trusted and selected as Xcode's run destination.
+- Full Xcode with the developer's Apple Account and Personal Team configured, plus the pinned tools from
+  `mise install`.
+- The demo `.dmg` and the password-protected `.p12` exported from the exact Xcode identity that signed FactoriOS.
 
 Record the commit, Factorio version, device model, iOS version, signing-team type and entitlement file before testing.
 
 #### Procedure
 
-1. Run `mise run dev`. Pass when installation succeeds and the launcher opens without terminating.
+1. Run FactoriOS from `xtool/FactoriOS.xcworkspace` on the connected device. Pass when Xcode installs it and the
+   launcher opens without terminating.
 2. Import the matching `.p12`. Pass when FactoriOS accepts its password and reports that the signing identity is
    available.
 3. Import the demo `.dmg`. Record the duration and final installation stage. Pass when extraction, conversion and
