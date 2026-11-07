@@ -124,11 +124,17 @@ class Xrefs:
         functions = sorted((s.value, s.name) for s in sl.macho.symbols if self.base <= s.value < self.base + text.size * 4)
         self.starts = [value for value, _ in functions]
         self.names = [name for _, name in functions]
+        self.end = self.base + text.size * 4
         self.symbol_values = {s.name: s.value for s in sl.macho.symbols if s.value}
         self.refs: dict[int | str, set[int]] = collections.defaultdict(set)
+        self.calls: dict[int, int] = {}
         self._stubs(sl, text)
         for pc, target in adrp_targets(text.tolist(), self.base):
             self.refs[self.slots.get(target, target)].add(pc)
+        self.by_pc: dict[int, set[int | str]] = collections.defaultdict(set)
+        for key, pcs in self.refs.items():
+            for pc in pcs:
+                self.by_pc[pc].add(key)
 
     def _stubs(self, sl: Slice, text: np.ndarray) -> None:
         stubs, stub_base = sl.words("__stubs")
@@ -144,12 +150,35 @@ class Xrefs:
         for pc, target in zip(pcs[is_bl].tolist(), (pcs + imm * 4)[is_bl].tolist(), strict=True):
             if targets.get(target):
                 self.refs[targets[target]].add(pc)
+            elif self.base <= target < self.base + text.size * 4:
+                self.calls[pc] = target
 
     def function(self, pc: int) -> str:
         return self.names[bisect.bisect_right(self.starts, pc) - 1]
 
     def callers(self, key: int | str) -> list[str]:
         return sorted({self.function(pc) for pc in self.refs.get(key, ())})
+
+    def bounds(self, address: int) -> tuple[int, int]:
+        index = bisect.bisect_right(self.starts, address) - 1
+        return self.starts[index], self.starts[index + 1] if index + 1 < len(self.starts) else self.end
+
+    def reach(self, address: int, depth: int) -> set[int | str]:
+        """Everything referenced by the function at `address` and the functions it calls, `depth` calls deep."""
+        seen: set[int] = set()
+        found: set[int | str] = set()
+        pending = [(address, 0)]
+        while pending:
+            start, level = pending.pop()
+            if start in seen:
+                continue
+            seen.add(start)
+            first, end = self.bounds(start)
+            for pc in range(first, end, 4):
+                found |= self.by_pc.get(pc, set())
+                if level < depth and pc in self.calls:
+                    pending.append((self.calls[pc], level + 1))
+        return found
 
 
 def section(title: str) -> None:
@@ -214,6 +243,25 @@ def report_metal(xrefs: Xrefs) -> None:
         raise SystemExit("no metal-cpp selector cache was referenced: the selector lookup no longer matches")
 
 
+def report_initializers(sl: Slice, xrefs: Xrefs, libraries: dict[str, set[str]]) -> None:
+    """Static initializers run inside dlopen, before FactoriOS can fill the compatibility slots."""
+    section("Load-time code (runs inside dlopen, before the compatibility slots are filled)")
+    for name in ("__objc_nlclslist", "__objc_nlcatlist"):
+        sec = next((s for s in sl.macho.sections if s.name == name), None)
+        print(f"{name} (+load): {sec.size // 8 if sec else 0} entries")
+    init = next(s for s in sl.macho.sections if s.name == "__mod_init_func")
+    start = sl.offset + init.offset
+    initializers = struct.unpack(f"<{init.size // 8}Q", sl.raw[start : start + init.size])
+    library_of = {symbol: library for library, symbols in libraries.items() for symbol in symbols}
+    reached = set().union(*(xrefs.reach(address, depth=3) for address in initializers))
+    imports = sorted(s for s in reached if isinstance(s, str) and s in library_of)
+    risky = [s for s in imports if library_of[s] in MAC_ONLY or s in PROCESS_CALLS]
+    print(f"__mod_init_func: {len(initializers)} initializers; imports reached three calls deep: {len(imports)}")
+    print(f"  from Mac-only libraries or replaced by FactoriOS: {', '.join(risky) or 'none'}")
+    others = sorted({library_of[s] for s in imports} - {"libSystem.B.dylib", "libobjc.A.dylib"})
+    print(f"  other libraries reached: {', '.join(others)}")
+
+
 def report_strings(sl: Slice) -> None:
     section("Strings")
     for needle in (b"SDL3_DYNAMIC_API", b"newLibraryWithSource", b"newDefaultLibrary", b"/proc/self"):
@@ -232,6 +280,7 @@ def main() -> int:
     report_game_owned(xrefs, libraries)
     report_process(xrefs)
     report_metal(xrefs)
+    report_initializers(sl, xrefs, libraries)
     report_strings(sl)
     return 0
 

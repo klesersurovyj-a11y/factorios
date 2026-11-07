@@ -113,6 +113,23 @@ iOS apps can neither `exec` nor `fork` **[inference: sandbox policy]**. The game
 `Paths::getSystemReadData` asks `CFBundleGetMainBundle` for the game's data directory, which on iOS is FactoriOS's
 bundle; `config.ini` (`read-data=`) points the game at the imported copy instead, as the Android launcher already did.
 
+## Code that runs while the library loads
+
+`dlopen` runs a library's static initializers and `+load` methods before it returns, which is before FactoriOS fills
+the compatibility slots. So none of that code may reach a Mac-only or replaced import:
+
+```
+__objc_nlclslist (+load): 0 entries
+__objc_nlcatlist (+load): 0 entries
+__mod_init_func: 448 initializers; imports reached three calls deep: 73
+  from Mac-only libraries or replaced by FactoriOS: none
+  other libraries reached: CoreGraphics, Foundation, Metal, QuartzCore
+```
+
+What they do reach from those four libraries are constants iOS has (`kCGColorSpaceSRGB`, `kCAFilter*`, the
+`MTLCommonCounter*` names, Foundation's error keys), so filling the slots right after `dlopen` and before the entry
+point is early enough. The report is part of `scripts/inspect-binary`, to be checked again on every new game version.
+
 ## Metal on iOS
 
 `metal-cpp` selectors that are macOS-only or behave differently on iOS, and the game code that uses them:
