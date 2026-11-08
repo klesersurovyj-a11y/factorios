@@ -1,4 +1,4 @@
-# Toolchain and tasks. Per-machine values (device, team, game, bundle ID) live in the uncommitted mise.local.toml,
+# Toolchain and tasks, for macOS with Xcode. Per-machine values (device, team, game, bundle ID) live in the uncommitted mise.local.toml,
 # written by `mise run setup`.
 [tools]
 swift = "6.4.2"
@@ -11,88 +11,34 @@ shellcheck = "0.11.0"
 
 [tools."github:xtool-org/xtool"]
 version = "1.24.0"
-
-[tools."github:xtool-org/xtool".platforms]
-linux-arm64 = { asset_pattern = "xtool-aarch64.AppImage", format = "raw", bin = "xtool" }
-linux-x64 = { asset_pattern = "xtool-x86_64.AppImage", format = "raw", bin = "xtool" }
-macos-arm64 = { asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
-macos-x64 = { asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
-
-# Playing
+asset_pattern = "xtool.app.zip"
+bin_path = "xtool.app/Contents/Resources/bin"
 
 [tasks.setup]
-description = "Finds your device, team and Factorio disk image and writes mise.local.toml"
+description = "Find your device, team and Factorio disk image"
 run = "python3 scripts/setup"
 
-[tasks.device]
-description = "Builds the app and the game, installs both on your iPhone or iPad and launches it"
+[tasks.deploy]
+description = "Build, install and launch FactoriOS with the game on your device"
 depends = ["xcode-project"]
-run = "scripts/device"
-
-# Development
+run = "scripts/deploy"
 
 [tasks.simulator]
-description = "Builds and launches the launcher (without the game) in the iOS Simulator"
+description = "Launch the launcher in the iOS Simulator"
 depends = ["xcode-project"]
 run = "scripts/simulator"
 
-[tasks.xcode-project]
-description = "Builds SDL3 if needed and generates xtool/FactoriOS.xcworkspace"
-depends = ["sdl3"]
-run = "xtool dev generate-xcode-project"
-
-[tasks.sdl3]
-hide = true
-description = "Builds SDL3 for iOS with the dynamic API on into Vendor/"
-run = "scripts/prepare-sdl3.sh"
-
-[tasks.check]
-description = "Lint, format check, docs check and the portable core build"
-depends = ["lint", "format-check", "build-host", "check-architecture", "check-repo"]
-
-[tasks.check-ios]
-description = "clang-tidy and the iOS device and simulator compile"
-depends = ["tidy", "build-ios"]
-
-[tasks.format]
-description = "Rewrites Swift sources with swift-format"
-run = "swift format format --in-place --recursive --parallel Package.swift Sources"
-
-# Parts of check and check-ios
-
 [tasks.lint]
-hide = true
-run = "swiftlint lint --strict --quiet"
-
-[tasks.format-check]
-hide = true
-run = "swift format lint --strict --recursive --parallel Package.swift Sources"
-
-[tasks.build-host]
-hide = true
-description = "Builds FactoriOSCore on this machine (FACTORIOS_CORE_ONLY hides the iOS targets)"
-env = { FACTORIOS_CORE_ONLY = "1" }
-run = "swift build --target FactoriOSCore"
-
-[tasks.check-architecture]
-hide = true
-description = "Every row of the compatibility map in docs/architecture.md is implemented"
-run = "python3 scripts/check-architecture"
-
-[tasks.check-repo]
-hide = true
-description = "Workflows, shell and Python scripts, property lists"
-run = [
-  "jactionlint",
-  "shellcheck scripts/device scripts/simulator scripts/prepare-sdl3.sh",
-  "PYTHONPYCACHEPREFIX=\"${TMPDIR:-/tmp}/factorios-pycache\" python3 -m py_compile scripts/setup scripts/check-architecture",
-  "python3 -c 'import plistlib, sys; [plistlib.load(open(p, \"rb\")) for p in sys.argv[1:]]' Resources/*.plist Resources/*.entitlements",
-]
-
-[tasks.tidy]
-hide = true
-description = "clang-tidy over the Objective-C sources against Xcode's iOS SDK"
+description = "Lint Swift, Objective-C, scripts, workflows and the compatibility map"
 run = """
+set -e
+swiftlint lint --strict --quiet
+swift format lint --strict --recursive --parallel Package.swift Sources
+python3 scripts/check-architecture
+jactionlint
+shellcheck scripts/deploy scripts/simulator scripts/prepare-sdl3.sh
+PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/factorios-pycache" python3 -m py_compile scripts/setup scripts/check-architecture
+plutil -lint -s Resources/*.plist Resources/*.entitlements
 clang-tidy --quiet Sources/FactoriOSCompat/*.m -- \
   -x objective-c -fobjc-arc -fblocks -fmodules \
   -fmodules-cache-path="${TMPDIR:-/tmp}/factorios-clang-modules" \
@@ -101,14 +47,23 @@ clang-tidy --quiet Sources/FactoriOSCompat/*.m -- \
   -ISources/FactoriOSCompat/include
 """
 
-[tasks.build-ios]
-hide = true
-description = "Compiles every iOS target for devices and the simulator"
-depends = ["sdl3"]
+[tasks.build]
+description = "Build the converter and the iOS targets for devices and the simulator"
 run = """
+set -e
+FACTORIOS_CORE_ONLY=1 swift build
+scripts/prepare-sdl3.sh
 for sdk in iphoneos iphonesimulator; do
   triple=arm64-apple-ios17.0
   [ "$sdk" = iphonesimulator ] && triple="$triple-simulator"
-  swift build --triple "$triple" --sdk "$(xcrun --sdk "$sdk" --show-sdk-path)" --target FactoriOSApp
+  swift build --triple "$triple" --sdk "$(xcrun --sdk "$sdk" --show-sdk-path)" --target FactoriOSRuntime
 done
 """
+
+[tasks.format]
+description = "Format Swift sources"
+run = "swift format format --in-place --recursive --parallel Package.swift Sources"
+
+[tasks.xcode-project]
+description = "Build SDL3 if needed and generate xtool/FactoriOS.xcworkspace"
+run = ["scripts/prepare-sdl3.sh", "xtool dev generate-xcode-project"]

@@ -1,5 +1,5 @@
 # Objective-C and C in Sources/FactoriOSCompat. Needs the iOS SDK headers, so it runs on a Mac:
-#   mise run tidy
+#   mise run lint
 Checks: >
   bugprone-*,
   cert-*,

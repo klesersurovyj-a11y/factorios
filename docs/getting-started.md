@@ -5,7 +5,7 @@ aren't supported yet.
 
 ```mermaid
 flowchart LR
-    A[1. Mac tools] --> B[2. Apple Account<br/>in Xcode] --> C[3. Prepare device] --> D[4. Download<br/>Factorio .dmg] --> E[5. mise run setup] --> F[6. mise run device] --> G[7. Trust developer<br/>on device]
+    A[1. Mac tools] --> B[2. Apple Account<br/>in Xcode] --> C[3. Prepare device] --> D[4. Download<br/>Factorio .dmg] --> E[5. mise run setup] --> F[6. mise run deploy] --> G[7. Trust developer<br/>on device]
 ```
 
 ## Requirements
@@ -65,7 +65,7 @@ candidates it lists them, and you choose with a flag: `mise run setup -- --devic
 ## 6. Build and install
 
 ```sh
-mise run device
+mise run deploy
 ```
 
 The first run takes a while: it builds SDL3 from source, the app, and the Mac converter, imports the disk image and
@@ -74,7 +74,7 @@ converts the game. Later runs reuse all of that and copy only changed game files
 ```mermaid
 sequenceDiagram
     participant X as Xcode
-    participant P as scripts/device
+    participant P as scripts/deploy
     participant D as Device
     X->>X: build and sign FactoriOS (automatic signing)
     P->>P: mount .dmg, copy factorio.app, factorios-convert to factorio.dylib
@@ -94,8 +94,8 @@ Factorio. [Playing](playing.md) covers the controls.
 ## Keeping it running
 
 - **Free accounts:** the provisioning profile expires after 7 days, and the app then stops launching. Run
-  `mise run device` again; your saves stay. A free account allows 3 devices and 3 sideloaded apps per device.
+  `mise run deploy` again; your saves stay. A free account allows 3 devices and 3 sideloaded apps per device.
 - **New Factorio version:** download the new `.dmg`, run `mise run setup` (it picks the newest image when the
-  configured one is gone, or pass `--dmg`), then `mise run device`.
+  configured one is gone, or pass `--dmg`), then `mise run deploy`.
 
 Something failed? See [Troubleshooting](troubleshooting.md).

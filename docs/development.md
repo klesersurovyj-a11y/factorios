@@ -9,15 +9,15 @@ Start with [Getting started](getting-started.md). Then read [Architecture](archi
 | Task | Does |
 |---|---|
 | `mise run setup` | Writes the device, team, disk image and bundle ID to `mise.local.toml` |
-| `mise run device` | Builds, prepares the game, installs and launches on the device ([`scripts/device`](../scripts/device)) |
+| `mise run deploy` | Builds, prepares the game, installs and launches on the device ([`scripts/deploy`](../scripts/deploy)) |
 | `mise run simulator` | Builds and launches the launcher in the iOS Simulator; the game itself only runs on a device |
 | `mise run xcode-project` | Builds SDL3 if needed and generates `xtool/FactoriOS.xcworkspace` for Xcode |
-| `mise run check` | SwiftLint, swift-format, the compatibility map check, repository lint, `FactoriOSCore` build |
-| `mise run check-ios` | clang-tidy on the Objective-C, and the iOS device and simulator compile |
+| `mise run lint` | SwiftLint, swift-format, clang-tidy, the compatibility map, workflows, scripts, property lists |
+| `mise run build` | `factorios-convert`, and the iOS device and simulator compile |
 | `mise run format` | Rewrites Swift sources with swift-format |
 
-Run `check` and `check-ios` before you open a pull request. CI (`.github/workflows/ci.yml`) runs `check` on Ubuntu and
-`check-ios` on macOS.
+Everything runs on macOS with Xcode. Run `lint` and `build` before you open a pull request; CI
+(`.github/workflows/ci.yml`) runs both.
 
 ## Layout
 
@@ -25,7 +25,7 @@ Run `check` and `check-ios` before you open a pull request. CI (`.github/workflo
 |---|---|
 | `Sources/` | The Swift package's modules ([Architecture](architecture.md#modules)) |
 | `Resources/` | `Info.plist`, entitlements, app icon |
-| `scripts/` | `setup`, `device`, `simulator`, SDL3 build, compatibility map check |
+| `scripts/` | `setup`, `deploy`, `simulator`, SDL3 build, compatibility map check |
 | `xtool.yml` | xtool's app description; `mise run xcode-project` turns the package into an Xcode project |
 | `artifact/` | Ignored: DerivedData, the prepared game, local disk images |
 | `Vendor/`, `xtool/` | Ignored: the built SDL3 framework and the generated workspace |
@@ -34,12 +34,13 @@ Run `check` and `check-ios` before you open a pull request. CI (`.github/workflo
 
 Run `mise run xcode-project` and open `xtool/FactoriOS.xcworkspace`. The workspace is generated and ignored, so make
 changes in `Package.swift`, `xtool.yml` or `Resources/`, then regenerate it. An app run from Xcode lacks the embedded
-game library, so the launcher shows its welcome screen. Use `mise run device` to play.
+game library, so the launcher shows its welcome screen. Use `mise run deploy` to play.
 
 ## Conventions
 
 - Swift 6 with warnings as errors. Objective-C with `-Weverything -Werror`. SwiftLint and swift-format are strict.
-- `FactoriOSCore` stays platform-independent and builds on Linux. Put logic there and keep UIKit/Metal code thin.
+- `FactoriOSCore` holds only what the app and the converter share. App code, UIKit-free logic included, goes in
+  `FactoriOSRuntime`'s folders.
 - A Mac API replacement goes into `Sources/FactoriOSCompat`, `GameLibrary.redirectedSymbols` when it fills a slot, and
   a row of the [compatibility map](architecture.md#compatibility-map). `check` verifies the map.
 

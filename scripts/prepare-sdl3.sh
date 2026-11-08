@@ -24,7 +24,7 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/factorios-sdl3.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 ARCHIVE="$WORK/SDL3.tar.gz"
 curl --fail --location --retry 3 --output "$ARCHIVE" "$URL"
-ACTUAL=$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$ARCHIVE")
+ACTUAL=$(shasum -a 256 "$ARCHIVE" | cut -d ' ' -f 1)
 if [ "$ACTUAL" != "$SHA256" ]; then
     echo "SDL archive checksum mismatch: $ACTUAL" >&2
     exit 1

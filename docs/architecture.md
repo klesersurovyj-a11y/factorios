@@ -7,26 +7,20 @@ system calls it reaches. The game logic stays the same.
 
 ```mermaid
 flowchart TB
-    App[FactoriOSApp<br/>entry point] --> UI[FactoriOSUI<br/>SwiftUI launcher, on-screen controller]
-    App --> Runtime
-    App --> SDL[SDL3.xcframework<br/>built from source, dynamic API on]
-    UI --> Runtime[FactoriOSRuntime<br/>install check, load, launch, input]
-    UI --> Core
-    Runtime --> Core[FactoriOSCore<br/>Mach-O, settings, controls<br/>platform-independent]
+    Runtime[FactoriOSRuntime<br/>app entry, launcher, load, launch, input, on-screen controller] --> Core[FactoriOSCore<br/>shared by app and converter:<br/>paths, slot manifest]
+    Runtime --> SDL[SDL3.xcframework<br/>built from source, dynamic API on]
     Runtime --> Compat[FactoriOSCompat<br/>Objective-C: Mac APIs on UIKit/Metal, SDL bridge]
-    Convert[FactoriOSConvert<br/>Mac CLI: factorios-convert] --> Core
+    Convert[FactoriOSConvert<br/>Mac CLI: factorios-convert, Mach-O converter] --> Core
 ```
 
 | Module | Main types |
 |---|---|
-| `FactoriOSCore/MachO` | `GameConverter`, `LoadCommandRewriter`, `BindStreamWalker`, `FatBinary` |
-| `FactoriOSCore/Game` | `GamePaths`, `GameLibrary`, `GameSettings`, `FactorioConfig`, `SaveLibrary`, `PadLayout`, `PadController`, `TouchGestures` |
-| `FactoriOSRuntime` | `AppEntry`, `GameInstallation`, `LaunchCoordinator`, `GameLoader`, `CompatTable`, `GameSession`, `SDLGameInput` |
+| `FactoriOSCore` | `GamePaths`, `GameLibrary` (redirected symbols), `SymbolSlotManifest`, JSON file helpers |
+| `FactoriOSRuntime` | `Game`: `AppEntry`, `GameSession`, `GameLoader`, `CompatTable`, `SDLGameInput` · `Controls`: `PadLayout`, `PadController`, `TouchGestures` · `Overlay`: `OverlayViewController`, `PadView` · `Settings`: `GameSettings`, `FactorioConfig` · `Launcher`: `LauncherScene`, `SaveLibrary` |
 | `FactoriOSCompat` | `FOSReplacements.m`, `FOSMetalFixes.m`, `FOSTextureCompression.m`, `FOSSDL.m`, `FOSWindowFrame.m` |
-| `FactoriOSUI` | `LauncherScene`, `HomeView`, `SettingsView`, `OverlayViewController`, `PadView`, `GameTouchView` |
-| `FactoriOSConvert` | `main.swift`: `GameLibrary.convert`, `GameLibrary.write` |
+| `FactoriOSConvert` | `main.swift`, `GameConverter`, `LoadCommandRewriter`, `BindStreamWalker`, `FatBinary` |
 
-`FACTORIOS_CORE_ONLY=1` hides the Apple-only targets so `FactoriOSCore` and `factorios-convert` build on the host.
+`FACTORIOS_CORE_ONLY=1` hides the iOS targets so `factorios-convert` builds for the Mac.
 
 ## Preparing the game on the Mac
 
@@ -39,7 +33,7 @@ flowchart LR
     dylib -->|codesign with the app's certificate| signed[signed dylib]
 ```
 
-[`scripts/device`](../scripts/device) does every step: macOS mounts the disk image, `factorios-convert` converts, and
+[`scripts/deploy`](../scripts/deploy) does every step: macOS mounts the disk image, `factorios-convert` converts, and
 `codesign` signs.
 
 The converter's changes to the arm64 slice:
@@ -55,7 +49,7 @@ The converter's changes to the arm64 slice:
 | Old signature removed, slots recorded | re-signed on the Mac; slots are patched after `dlopen` |
 
 Shaders ship as Metal source, which iOS compiles at run time. iOS loads code only from inside the app bundle, so the
-signed library is embedded in the app ([`scripts/device`](../scripts/device)) and the game data goes to the app's
+signed library is embedded in the app ([`scripts/deploy`](../scripts/deploy)) and the game data goes to the app's
 `Library/Application Support/FactoriOS/Game`.
 
 ## Launch
@@ -92,7 +86,7 @@ sequenceDiagram
 ## Compatibility map
 
 Every Mac API the game's own code reaches, and its iOS replacement. Symbol rows fill the slots the converter recorded.
-Metal rows patch the live Metal classes. `mise run check` verifies each row against `Sources/FactoriOSCompat`.
+Metal rows patch the live Metal classes. `mise run lint` verifies each row against `Sources/FactoriOSCompat`.
 
 | Mac API | Member | FactoriOS | iOS backing |
 |---|---|---|---|

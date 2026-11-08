@@ -11,11 +11,11 @@
 | xcodebuild: *Developer Mode disabled* | Settings → Privacy & Security → Developer Mode, then restart the device |
 | xcodebuild: *maximum number of apps* | A free team allows 3 sideloaded apps per device. Delete one |
 | App icon appears, launch says *Untrusted Developer* | Settings → General → VPN & Device Management → your account → Trust |
-| App stopped opening after a week | The free provisioning profile expired. Run `mise run device` |
-| Welcome screen instead of the home screen | The game data didn't reach the device. Run `mise run device` again and check the `devicectl device copy` step |
+| App stopped opening after a week | The free provisioning profile expired. Run `mise run deploy` |
+| Welcome screen instead of the home screen | The game data didn't reach the device. Run `mise run deploy` again and check the `devicectl device copy` step |
 | Game closes while loading | Out of memory. Set Sprite quality to Medium. Light graphics also help |
 | `SDL archive checksum mismatch` | The SDL download is corrupt or changed upstream. Delete `Vendor/` and retry |
-| `xtool/FactoriOS.xcworkspace` out of date after pulling | `mise run device` regenerates it. Run `mise run xcode-project` to regenerate it on its own |
+| `xtool/FactoriOS.xcworkspace` out of date after pulling | `mise run deploy` regenerates it. Run `mise run xcode-project` to regenerate it on its own |
 
 ## Collecting logs
 

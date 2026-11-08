@@ -18,17 +18,17 @@ let strictObjC: [CSetting] = [
     ])
 ]
 
+// What the app and the converter share: paths, the redirected symbols and the slot manifest's format.
 let core: Target = .target(
     name: "FactoriOSCore",
     swiftSettings: strictSwift
 )
 
-// UIKit, Metal and the Objective-C runtime build only for Apple platforms. `mise run build-host` sets
-// FACTORIOS_CORE_ONLY to compile the core on the build machine itself; xtool, which cross-compiles from Linux too,
-// sees every target.
+// `mise run build` sets FACTORIOS_CORE_ONLY to compile the core and the converter for the Mac itself; xtool and the iOS
+// build see every other target.
 let coreOnly = Context.environment["FACTORIOS_CORE_ONLY"] != nil
 
-// The development Mac's command that converts the imported game before scripts/device signs it and copies it to a
+// The development Mac's command that converts the imported game before scripts/deploy signs it and copies it to a
 // device. It only exists in the host build, so xtool's iOS project never sees a macOS executable.
 let hostTargets: [Target] =
     coreOnly
@@ -45,29 +45,18 @@ let appleTargets: [Target] =
         .binaryTarget(name: "SDL3", path: "Vendor/SDL3.xcframework"),
         // The game's Mac-only API surface on UIKit/Metal, and the SDL3 bridge.
         .target(name: "FactoriOSCompat", cSettings: strictObjC),
-        // Loading and running the converted game.
+        // The app: its @main, the launcher, loading and running the converted game, and the on-screen controller.
         .target(
             name: "FactoriOSRuntime",
-            dependencies: ["FactoriOSCore", "FactoriOSCompat"],
-            swiftSettings: strictSwift
-        ),
-        // SwiftUI launcher and on-screen controller.
-        .target(name: "FactoriOSUI", dependencies: ["FactoriOSCore", "FactoriOSRuntime"], swiftSettings: strictSwift),
-        // Entry point: hands the app's start-up to SDL, as SDL requires on iOS.
-        .target(
-            name: "FactoriOSApp",
-            dependencies: ["FactoriOSUI", "FactoriOSRuntime", "SDL3"],
+            dependencies: ["FactoriOSCore", "FactoriOSCompat", "SDL3"],
             swiftSettings: strictSwift
         ),
     ]
 // xtool builds the FactoriOS library into FactoriOS.app.
 let products: [Product] =
     coreOnly
-    ? [
-        .library(name: "FactoriOSCore", targets: ["FactoriOSCore"]),
-        .executable(name: "factorios-convert", targets: ["FactoriOSConvert"]),
-    ]
-    : [.library(name: "FactoriOS", targets: ["FactoriOSApp"])]
+    ? [.executable(name: "factorios-convert", targets: ["FactoriOSConvert"])]
+    : [.library(name: "FactoriOS", targets: ["FactoriOSRuntime"])]
 
 let package = Package(
     name: "FactoriOS",

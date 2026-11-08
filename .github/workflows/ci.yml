@@ -14,28 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  portable:
-    name: Portable build and checks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-
-      - name: Install pinned tools
-        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
-        with:
-          cache: true
-          install: true
-
-
-      - name: Build and verify portable code
-        run: mise run check
-
-  ios:
-    name: iOS compile and Objective-C analysis
+  check:
+    name: Lint and build
+    # macOS: clang-tidy and the iOS build need Xcode.
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -50,5 +31,8 @@ jobs:
           cache: true
           install: true
 
-      - name: Build and verify iOS code
-        run: mise run check-ios
+      - name: Lint
+        run: mise run lint
+
+      - name: Build
+        run: mise run build

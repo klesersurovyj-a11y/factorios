@@ -19,7 +19,7 @@ You need a Mac with Xcode, an iPhone or iPad on iOS 17 or later, a free Apple Ac
 git clone https://github.com/kmnft/factorios.git && cd factorios
 mise install       # pinned toolchain
 mise run setup     # finds your device, Apple team and Factorio .dmg; writes mise.local.toml
-mise run device    # builds, signs, installs and launches FactoriOS with the game
+mise run deploy    # builds, signs, installs and launches FactoriOS with the game
 ```
 
 [Getting started](docs/getting-started.md) walks through each step, including Xcode and device preparation.

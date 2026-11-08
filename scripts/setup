@@ -127,7 +127,7 @@ def main() -> None:
     subprocess.run(["mise", "set", "--file", str(LOCAL), *(f"{k}={v}" for k, v in values.items())], check=True)
     for key, value in values.items():
         print(f"{key} = {value}")
-    print(f"wrote {LOCAL.name}; next: mise run device")
+    print(f"wrote {LOCAL.name}; next: mise run deploy")
 
 
 if __name__ == "__main__":
