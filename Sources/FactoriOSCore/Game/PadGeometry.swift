@@ -17,7 +17,7 @@ public struct PadPoint: Equatable, Sendable {
     }
 }
 
-/// Where a `PadLayout`'s controls sit on a screen of a given size.
+/// Where a pad layout's controls sit on a screen of a given size.
 ///
 /// The layout is drawn in a phone-shaped frame, a share of a phone's height, so a tablet's controls are a phone's size
 /// and most of the game stays in view; each control is measured from its anchor's corner of the screen, and kept on
@@ -69,7 +69,7 @@ public struct PadGeometry: Equatable, Sendable {
         control.size * layout.placement(of: control).scale * frame / 2
     }
 
-    /// Half of `control`'s width: a pill is twice as wide as high.
+    /// Half of a control's width: a pill is twice as wide as high.
     public func halfWidth(of control: PadControlID, in layout: PadLayout) -> Double {
         let radius = radius(of: control, in: layout)
         return control.isPill ? 2 * radius : radius
@@ -110,7 +110,7 @@ public struct PadGeometry: Equatable, Sendable {
         return nil
     }
 
-    /// Puts `control`'s middle at `point`, kept on screen: the inverse of `center(of:in:)`.
+    /// Puts a control's middle at `point`, kept on screen: the inverse of `center(of:in:)`.
     public func move(_ control: PadControlID, to point: PadPoint, in layout: inout PadLayout) {
         guard frame > 0 else {
             // Nothing to measure on a zero-sized overlay.

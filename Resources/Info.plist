@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>FactoriOS</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>

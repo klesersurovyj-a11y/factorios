@@ -71,7 +71,9 @@ public enum GameConverter {
         return streams
     }
 
-    /// Truncates the file at the old signature and returns `__LINKEDIT`'s new sizes; `nil` if it was unsigned.
+    /// Removes the code signature, returning the new `__LINKEDIT` sizes.
+    ///
+    /// Truncates the file at the old signature; `nil` if it was unsigned.
     private static func removeSignature(
         from image: inout Data, table: LoadCommandTable
     ) throws -> LoadCommandRewriter.LinkeditSize? {

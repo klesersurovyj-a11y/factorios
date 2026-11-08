@@ -1,0 +1,86 @@
+# Development
+
+Start with [Getting started](getting-started.md). Then read [Architecture](architecture.md).
+
+## Tasks
+
+`mise tasks` lists them.
+
+| Task | Does |
+|---|---|
+| `mise run setup` | Writes the device, team, disk image and bundle ID to `mise.local.toml` |
+| `mise run device` | Builds, prepares the game, installs and launches on the device ([`scripts/device`](../scripts/device)) |
+| `mise run simulator` | Builds and launches the launcher in the iOS Simulator; the game itself only runs on a device |
+| `mise run xcode-project` | Builds SDL3 if needed and generates `xtool/FactoriOS.xcworkspace` for Xcode |
+| `mise run check` | SwiftLint, swift-format, the compatibility map check, repository lint, `FactoriOSCore` build |
+| `mise run check-ios` | clang-tidy on the Objective-C, and the iOS device and simulator compile |
+| `mise run format` | Rewrites Swift sources with swift-format |
+| `mise run inspect` | Reports what a Factorio build needs from macOS (see [below](#new-factorio-versions)) |
+
+Run `check` and `check-ios` before you open a pull request. CI (`.github/workflows/ci.yml`) runs `check` on Ubuntu and
+`check-ios` on macOS.
+
+## Layout
+
+| Path | Contents |
+|---|---|
+| `Sources/` | The Swift package's modules ([Architecture](architecture.md#modules)) |
+| `Resources/` | `Info.plist`, entitlements, app icon |
+| `scripts/` | `setup`, `device`, `simulator`, SDL3 build, binary inspector, compatibility map check |
+| `xtool.yml` | xtool's app description; `mise run xcode-project` turns the package into an Xcode project |
+| `artifact/` | Ignored: DerivedData, the prepared game, local disk images |
+| `Vendor/`, `xtool/` | Ignored: the built SDL3 framework and the generated workspace |
+
+## Working in Xcode
+
+Run `mise run xcode-project` and open `xtool/FactoriOS.xcworkspace`. The workspace is generated and ignored, so make
+changes in `Package.swift`, `xtool.yml` or `Resources/`, then regenerate it. An app run from Xcode lacks the embedded
+game library, so the launcher shows its welcome screen. Use `mise run device` to play.
+
+## Conventions
+
+- Swift 6 with warnings as errors. Objective-C with `-Weverything -Werror`. SwiftLint and swift-format are strict.
+- `FactoriOSCore` stays platform-independent and builds on Linux. Put logic there and keep UIKit/Metal code thin.
+- A Mac API replacement goes into `Sources/FactoriOSCompat`, the symbol list in `scripts/inspect-binary`, and a row of
+  the [compatibility map](architecture.md#compatibility-map). `check` verifies the map.
+
+## On-device debugging
+
+Replace `$DEVICE` with `FACTORIOS_DEVICE_ID` and `$BUNDLE` with `FACTORIOS_BUNDLE_ID`.
+
+```sh
+# FactoriOS's logs (factorios.log, game.log)
+xcrun devicectl device copy from --device $DEVICE --domain-type appDataContainer --domain-identifier $BUNDLE \
+  --source "Library/Application Support/FactoriOS/Logs" --destination logs/
+# Factorio's own log
+xcrun devicectl device copy from --device $DEVICE --domain-type appDataContainer --domain-identifier $BUNDLE \
+  --source "Documents/Factorio/factorio-current.log" --destination logs/
+# Crash reports
+xcrun devicectl device copy from --device $DEVICE --domain-type systemCrashLogs --source / --destination crashes/
+# Screenshot
+xcrun devicectl device capture screenshot --device $DEVICE --destination screen.png
+```
+
+To attach lldb, launch with `xcrun devicectl device process launch --device $DEVICE --terminate-existing $BUNDLE
+--json-output launch.json` and read the PID from `result.process.processIdentifier`. Then in an interactive
+`xcrun lldb`, run `device select <devicectl identifier>` and `device process attach -p <pid>`. Attaching takes about
+20 seconds.
+
+**Detailed logs** in the launcher's settings turn on Metal validation and verbose SDL logging.
+
+## New Factorio versions
+
+```sh
+mise run inspect                       # uses $FACTORIOS_DMG
+mise run inspect -- path/to/factorio   # or an extracted executable
+```
+
+The report lists the Mac-only imports the game's own code reaches, the code that runs while the library loads (before
+the compatibility slots are filled), process control calls, and Metal selectors that differ on iOS. Anything new that
+isn't in the [compatibility map](architecture.md#compatibility-map) needs a replacement before the version can run.
+
+## Updating SDL3
+
+`scripts/prepare-sdl3.sh` pins SDL's version and SHA-256. The bundled SDL must be at least as new as the SDL the game
+links statically (Factorio 2.1.24 links 3.4.14), because SDL's dynamic API rejects a caller with a larger function
+table. Bump `RECIPE` when the build steps change so existing `Vendor/` builds are replaced.

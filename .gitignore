@@ -1,10 +1,17 @@
-.bsp/
+# Build output and tool state
 .build/
 .swiftpm/
+.bsp/
 .venv/
-mise.local.toml
 /xtool/
-*.ipa
-/artifact
-/reference
 /Vendor/
+
+# Per-machine configuration, written by `mise run setup`
+mise.local.toml
+
+# Factorio disk images, the prepared game and DerivedData: never commit the game
+/artifact/
+*.dmg
+
+# macOS
+.DS_Store

@@ -1,47 +1,63 @@
 # FactoriOS
 
-Play your own copy of Factorio on an iPhone or iPad. FactoriOS imports the **macOS** build you download from
-factorio.com, turns it into a library iOS can load, signs it with the same Apple Development identity used to provision
-FactoriOS, embeds it in the app bundle, and runs it natively. SDL3 for iOS and a small compatibility layer replace the
-few Mac-only APIs the game uses. No emulation, no streaming, and none of the game's files in the app.
+Run your own copy of [Factorio](https://factorio.com) natively on an iPhone or iPad. FactoriOS takes the **macOS** build
+you download from `factorio.com`, converts it into a library iOS can load, signs it with your Apple Development
+identity, and runs it with SDL3 for iOS and a small compatibility layer standing in for the few Mac-only APIs the game
+uses. There is no emulation or streaming, and the repository contains no game files.
 
-**Status: Factorio 2.1.24 runs on an iPhone 14 (A15, iOS 26.6.1)** at native resolution and 60 FPS with Medium
-sprites. Physical controllers and the restart prompt are unverified; `docs/architecture.md` has the device status.
+![Factorio on an iPhone with FactoriOS's on-screen controller](docs/images/gameplay.jpg)
+
+**Status:** Factorio 2.1.24 runs on an iPhone 14 (A15, iOS 26) at native resolution and 60 FPS with Medium sprites.
+Physical controllers and the in-game restart prompt are not yet verified on a device.
+
+## Quick start
+
+You need a Mac with Xcode, an iPhone or iPad on iOS 17 or later, a free Apple Account, and Factorio for macOS (the
+[demo](https://factorio.com/download) works).
+
+```sh
+git clone https://github.com/kmnft/factorios.git && cd factorios
+mise install       # pinned toolchain
+mise run setup     # finds your device, Apple team and Factorio .dmg; writes mise.local.toml
+mise run device    # builds, signs, installs and launches FactoriOS with the game
+```
+
+[Getting started](docs/getting-started.md) walks through each step, including Xcode and device preparation.
+
+## Documentation
+
+| Guide | For |
+|---|---|
+| [Getting started](docs/getting-started.md) | Building and installing on your device, step by step |
+| [Playing](docs/playing.md) | Launcher, settings, touch controls, saves and logs |
+| [Troubleshooting](docs/troubleshooting.md) | Signing, install and game launch problems |
+| [Development](docs/development.md) | Tasks, checks, CI, simulator, on-device debugging, new game versions |
+| [Architecture](docs/architecture.md) | Modules, the conversion pipeline, launch sequence and compatibility map |
+| [AGENTS.md](AGENTS.md) | Orientation for coding agents |
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    dmg[factorio .dmg] --> importer[Importer<br/>UDIF, bzip2, HFS+]
-    importer --> app[factorio.app]
-    app --> converter[Converter<br/>Mach-O to iOS dylib]
-    converter --> signer[codesign on the Mac<br/>embed in the app]
-    signer --> loader[Loader<br/>dlopen, compat slots]
-    loader --> game[Factorio's main]
-    game -- SDL3_DYNAMIC_API --> sdl[SDL3 for iOS]
-    game -- AppKit, OpenCL, Metal quirks --> compat[Compatibility layer]
+    dmg[Factorio .dmg] --> prepare[Mac: import, convert<br/>Mach-O to iOS dylib, codesign]
+    xcode[Xcode build<br/>FactoriOS app + SDL3] --> embed[Embed dylib, re-sign]
+    prepare --> embed
+    embed --> device[Install on device<br/>+ copy game data]
+    device --> run[dlopen, fill compat slots,<br/>run Factorio's main]
 ```
 
-- [Feasibility](docs/feasibility.md): what the macOS binary needs, from its own load commands and code.
-- [Architecture](docs/architecture.md): modules, public APIs, the compatibility map, and device status.
-- [Building](docs/building.md): tools, checks, and building the app with xtool.
+## Legal
 
-## Requirements
-
-- An arm64 iPhone or iPad on iOS 17 or later, connected to a Mac with Xcode and installed through the developer's
-  Personal Team. Which device generations can run the game within their CPU and memory limits remains a device-test
-  gate.
-- Factorio for macOS from [factorio.com/download](https://factorio.com/download) (the demo works too).
-
-`mise run device` builds the app, imports and converts the game on the Mac, signs it with the same certificate as the
-app, embeds the signed library in the app bundle, and copies the game data to the device, which opens ready to play.
-iOS refuses to load code from the app's data container, so the library has to travel inside the app.
-
-This is Apple's developer-owned, connected-device workflow, not App Store or TestFlight distribution. xtool generates
-the Xcode workspace from the Swift package; Xcode performs automatic signing and installation. The imported-code
-runtime is not App Store eligible. The converted library lives in the installed app bundle and the game data in the
-app's container on your own device; neither is in the repository.
-
-## Factorio
-
-Factorio is © Wube Software. FactoriOS isn't affiliated with Wube and includes none of its files.
+- **FactoriOS** is released under the [MIT License](LICENSE).
+- **Factorio** is a trademark of Wube Software Ltd. FactoriOS is an unofficial fan project, not affiliated with or
+  endorsed by Wube Software. It includes no Factorio code, data or assets: you supply your own copy from `factorio.com`,
+  and the [Factorio terms of service](https://factorio.com/terms-of-service) still apply to it. They grant personal,
+  non-commercial use and forbid distributing the game or altered versions of it, so never share the converted
+  library, an app build that contains it, or the game data. The screenshot shows Factorio content, © Wube Software,
+  for illustration.
+- **SDL3** (zlib License) is downloaded from [libsdl-org/SDL](https://github.com/libsdl-org/SDL) at build time, built
+  from source and embedded in the app; its license is in the SDL source tarball.
+- **LiveContainer** (AGPL-3.0) is cited as prior art for loading an executable as a library. FactoriOS uses none of its
+  code.
+- **Apple, iPhone, iPad, Xcode and macOS** are trademarks of Apple Inc. FactoriOS installs through Apple's
+  developer-owned device workflow. It isn't distributed through, and isn't eligible for, the App Store or TestFlight.

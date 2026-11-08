@@ -18,9 +18,9 @@ struct WelcomeView: View {
                 .foregroundStyle(.secondary)
                 Text(
                     """
-                    On a Mac with Xcode, set FACTORIOS_DMG in mise.local.toml, then run `mise run device`. The task \
-                    imports and converts the disk image from factorio.com, embeds the signed library in the app, \
-                    and installs both the app and the game data on this device. The demo works too.
+                    On a Mac with Xcode, download Factorio for macOS from factorio.com (the demo works too), then run \
+                    `mise run setup` and `mise run device` in the FactoriOS repository. They import and convert the \
+                    disk image, embed the signed game in the app, and install the app and the game data here.
                     """
                 )
                 .font(.callout)

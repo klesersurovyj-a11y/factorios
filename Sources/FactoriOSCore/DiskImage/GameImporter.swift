@@ -32,9 +32,11 @@ public enum GameImporter {
         let displayName: String?
     }
 
+    /// Imports factorio.app from a disk image and returns what was imported.
+    ///
     /// Finds factorio.app (at the volume root or one directory down), extracts it to `paths.gameImporting`
     /// (skipping `*.dSYM`), checks `Contents/MacOS/factorio` exists, reads the version from
-    /// `Contents/data/base/info.json` and whether it is the demo from `Info.plist`'s `CFBundleDisplayName`,
+    /// `Contents/data/base/info.json` and whether it is the demo from the `CFBundleDisplayName` in `Info.plist`,
     /// replaces `paths.gameApp` with it, writes `paths.gameInfo` and returns it.
     ///
     /// Runs for minutes (about 1.5 GB is decompressed).

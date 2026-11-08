@@ -121,7 +121,7 @@ public struct PadLayout: Codable, Sendable, Equatable {
         PadControlID.allCases.filter { !placement(of: $0).shown }
     }
 
-    /// Moves `control`'s middle to (`x`, `y`) in the layout frame's fractions.
+    /// Moves a control's middle to (`x`, `y`) in the layout frame's fractions.
     public mutating func move(_ control: PadControlID, x: Double, y: Double) {
         var placement = placement(of: control)
         placement.x = x

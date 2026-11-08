@@ -1,0 +1,43 @@
+#!/bin/sh
+# Builds and signs the app for the configured iPhone or iPad, prepares the game on this Mac with the same signing
+# identity, embeds the game library in the app, installs the app and the game data, and launches it.
+# iOS only loads code from inside the app bundle, so the library has to travel in it.
+set -eu
+
+missing="is not set; run 'mise run setup'"
+device=${FACTORIOS_DEVICE_ID:?$missing}
+team=${FACTORIOS_TEAM_ID:?$missing}
+bundle_id=${FACTORIOS_BUNDLE_ID:?$missing}
+dmg=${FACTORIOS_DMG:?$missing}
+derived_data=${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}
+app="$derived_data/Build/Products/Debug-iphoneos/FactoriOS-App.app"
+game=artifact/game/FactoriOS
+
+xcodebuild \
+    -workspace xtool/FactoriOS.xcworkspace -scheme FactoriOS-App -configuration Debug \
+    -destination "id=$device" -derivedDataPath "$derived_data" \
+    -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+    DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
+    build
+
+# The SHA-1 of the certificate Xcode signed the app with: codesign's name for that identity.
+certificates=$(mktemp -d)
+trap 'rm -rf "$certificates"' EXIT
+codesign -d --extract-certificates="$certificates/cert" "$app" 2>/dev/null
+identity=$(shasum -a 1 "$certificates/cert0" | cut -d ' ' -f 1)
+
+# Imports the disk image (skipped while it is unchanged), converts the game and signs the library.
+FACTORIOS_CORE_ONLY=1 swift run -c release factorios-prepare --dmg "$dmg" --output "$game" --identity "$identity"
+
+mkdir -p "$app/Frameworks"
+cp "$game/Converted/factorio.dylib" "$app/Frameworks/factorio.dylib"
+cp "$game/Converted/slots.json" "$app/Frameworks/factorio.slots.json"
+chmod 755 "$app/Frameworks/factorio.dylib"
+codesign --force --sign "$identity" --preserve-metadata=entitlements,requirements,flags,runtime "$app"
+codesign --verify --deep --strict "$app"
+
+xcrun devicectl device install app --device "$device" "$app"
+xcrun devicectl device copy to --device "$device" \
+    --domain-type appDataContainer --domain-identifier "$bundle_id" \
+    --source "$game/Game" --destination "Library/Application Support/FactoriOS/Game"
+xcrun devicectl device process launch --device "$device" --terminate-existing "$bundle_id"

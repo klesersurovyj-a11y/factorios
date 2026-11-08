@@ -1,0 +1,31 @@
+#!/bin/sh
+# Builds the app for the iOS Simulator, installs it and launches it. The game itself is device code, so the simulator
+# only shows the launcher's welcome screen: useful for UI work, not proof that the game runs.
+# Uses $FACTORIOS_SIMULATOR_ID, else a booted simulator, else boots the one Simulator.app last used.
+set -eu
+
+derived_data=${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}
+bundle_id=${FACTORIOS_BUNDLE_ID:-app.factorios}
+
+booted() { xcrun simctl list devices booted | grep -Eo '[0-9A-F-]{36}' | head -n 1; }
+
+simulator=${FACTORIOS_SIMULATOR_ID:-$(booted)}
+if [ -z "$simulator" ]; then
+    open -a Simulator
+    for _ in $(seq 60); do
+        simulator=$(booted)
+        [ -n "$simulator" ] && break
+        sleep 1
+    done
+fi
+[ -n "$simulator" ] || { echo 'no simulator booted; set FACTORIOS_SIMULATOR_ID (xcrun simctl list devices)' >&2; exit 1; }
+xcrun simctl boot "$simulator" 2>/dev/null || true
+xcrun simctl bootstatus "$simulator" -b
+
+xcodebuild \
+    -workspace xtool/FactoriOS.xcworkspace -scheme FactoriOS-App -configuration Debug \
+    -destination "platform=iOS Simulator,id=$simulator" -derivedDataPath "$derived_data" \
+    CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
+    build
+xcrun simctl install "$simulator" "$derived_data/Build/Products/Debug-iphonesimulator/FactoriOS-App.app"
+xcrun simctl launch "$simulator" "$bundle_id"
