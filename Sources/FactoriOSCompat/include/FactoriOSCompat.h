@@ -33,9 +33,10 @@ int FOSCompatWriteSlot(void *slot, const void *value);
 /// Adapts Metal and Core Animation to the macOS behaviour the game expects. Call once, before the game starts.
 ///
 /// Managed storage becomes shared storage; `didModifyRange:` and the blit encoder's `synchronize...` methods exist and
-/// do nothing (Apple GPUs share memory with the CPU); `isLowPower` answers NO; `CAMetalLayer` accepts
-/// `setDisplaySyncEnabled:`; `presentDrawable:` honours the frame-rate cap; `nextDrawable` waits while the app is in
-/// the background, where iOS forbids GPU work.
+/// do nothing (Apple GPUs share memory with the CPU); `isLowPower` and `isDepth24Stencil8PixelFormatSupported` answer
+/// NO; `CAMetalLayer` accepts `setDisplaySyncEnabled:`; `presentDrawable:` honours the frame-rate cap; `nextDrawable`
+/// waits while the app is in the background, where iOS forbids GPU work. On GPUs without BC formats, BC1-BC5 textures
+/// are created uncompressed and their uploads decoded on the CPU.
 void FOSCompatInstallMetalFixes(void);
 
 /// Sets what `_NSGetExecutablePath` answers: the imported game's macOS executable rather than FactoriOS.

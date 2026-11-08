@@ -3,6 +3,7 @@ import FactoriOSCompat
 import FactoriOSCore
 import Foundation
 import GameController
+import Metal
 import UIKit
 
 /// One run of the game.
@@ -80,7 +81,8 @@ final class GameSession {
         let settings = try FactorioConfig.write(
             paths: paths,
             settings: store.load(),
-            keyboardAndMouse: keyboardAndMouse
+            keyboardAndMouse: keyboardAndMouse,
+            supportsBCTextures: MTLCreateSystemDefaultDevice()?.supportsBCTextureCompression ?? false
         )
         try store.save(settings)
         return settings

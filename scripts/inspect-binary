@@ -54,10 +54,16 @@ REPLACED_SYMBOLS = {
     "__NSGetExecutablePath",
 }
 PRELOAD_REDIRECTS = {"_nan": "libSystem.B.dylib"}
+# Selectors the macOS SDK's Metal and QuartzCore headers mark API_UNAVAILABLE(ios), plus the BC/memory queries whose
+# answers differ on iOS.
 MAC_ONLY_METAL_SELECTORS = (
-    "setDisplaySyncEnabled_", "didModifyRange_", "synchronizeResource_", "synchronizeTexture_slice_level_",
-    "isLowPower", "isHeadless", "isRemovable", "location", "maxTransferRate", "peerGroupID",
-    "recommendedMaxWorkingSetSize", "supportsBCTextureCompression", "hasUnifiedMemory",
+    "setDisplaySyncEnabled_", "displaySyncEnabled", "didModifyRange_", "synchronizeResource_",
+    "synchronizeTexture_slice_level_", "isLowPower", "isHeadless", "isRemovable", "location", "locationNumber",
+    "maxTransferRate", "peerGroupID", "peerIndex", "peerCount", "isDepth24Stencil8PixelFormatSupported",
+    "depth24Stencil8PixelFormatSupported", "setShouldMaximizeConcurrentCompilation_",
+    "shouldMaximizeConcurrentCompilation", "newRemoteBufferViewForDevice_", "newRemoteTextureViewForDevice_",
+    "remoteStorageBuffer", "remoteStorageTexture", "textureBarrier", "recommendedMaxWorkingSetSize",
+    "supportsBCTextureCompression", "hasUnifiedMemory",
 )
 # Functions that belong to the game's statically linked SDL3 (never executed once SDL3_DYNAMIC_API redirects it).
 SDL_OWNED = re.compile(

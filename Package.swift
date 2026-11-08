@@ -39,8 +39,9 @@ let hostTargets: [Target] =
     ? [.executableTarget(name: "FactoriOSPrepare", dependencies: ["FactoriOSCore"], swiftSettings: strictSwift)]
     : []
 
-// SDL3's official, pinned Apple XCFramework is prepared by the iOS build and dev tasks. xtool embeds the binary target
-// in the app's Frameworks directory, where the game's static SDL3 finds it through SDL3_DYNAMIC_API.
+// SDL3's Apple XCFramework, built from SDL's pinned source with the dynamic API on, is prepared by the iOS build and
+// dev tasks. xtool embeds the binary target in the app's Frameworks directory, where the game's static SDL3 finds it
+// through SDL3_DYNAMIC_API.
 let appleTargets: [Target] =
     coreOnly
     ? []

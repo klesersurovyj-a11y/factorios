@@ -141,6 +141,8 @@ on Apple's developer-only Metal HUD.
 - `Sources/FactoriOSCompat/FOSWorkspace.m`: `FOSWorkspace`
 - `Sources/FactoriOSCompat/FOSReplacements.m`: `FOSCompatReplacements`, `fos_execv`, `fos_fork`, `fos_NSGetExecutablePath`
 - `Sources/FactoriOSCompat/FOSMetalFixes.m`: `FOSCompatInstallMetalFixes`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatPresentedFrameCount`
+- `Sources/FactoriOSCompat/FOSTextureCompression.h`: `FOSBCDecodedFormat`, `FOSBCDecodedBytesPerPixel`, `FOSBCBlockBytes`, `FOSBCDecode`
+- `Sources/FactoriOSCompat/FOSTextureCompression.m`: `FOSBCDecodedFormat`, `FOSBCDecodedBytesPerPixel`, `FOSBCBlockBytes`, `FOSBCDecode`
 - `Sources/FactoriOSCompat/FOSSDL.m`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLGameWindow`
 - `Sources/FactoriOSCompat/FOSWindowFrame.m`: `FOSCompatSetWindowFrame`
 
@@ -181,13 +183,15 @@ are filled into the slots the converter recorded; Metal rows change the live Met
 | `MTLDevice` | `newBufferWithLength:options:` | `FOSNewBuffer` | managed storage becomes shared |
 | `MTLDevice` | `newBufferWithBytes:length:options:` | `FOSNewBufferBytes` | managed storage becomes shared |
 | `MTLDevice` | `newBufferWithBytesNoCopy:length:options:deallocator:` | `FOSNewBufferNoCopy` | managed storage becomes shared |
-| `MTLDevice` | `newTextureWithDescriptor:` | `FOSNewTexture` | managed storage becomes shared |
+| `MTLDevice` | `newTextureWithDescriptor:` | `FOSNewTexture` | managed storage becomes shared; without BC, BC1-BC5 become the uncompressed format with the same channels |
 | `MTLTextureDescriptor` | `setStorageMode:` | `FOSSetStorageMode` | managed storage becomes shared |
 | `MTLTextureDescriptor` | `setResourceOptions:` | `FOSSetResourceOptions` | managed storage becomes shared |
 | `MTLBuffer` | `didModifyRange:` | `FOSBufferDidModifyRange` | nothing to do: unified memory |
 | `MTLBlitCommandEncoder` | `synchronizeResource:` | `FOSBlitSynchronizeResource` | nothing to do: unified memory |
 | `MTLBlitCommandEncoder` | `synchronizeTexture:slice:level:` | `FOSBlitSynchronizeTexture` | nothing to do: unified memory |
 | `MTLDevice` | `isLowPower` | `FOSDeviceIsLowPower` | NO: one GPU |
+| `MTLDevice` | `isDepth24Stencil8PixelFormatSupported` | `FOSDeviceIsDepth24Stencil8PixelFormatSupported` | NO: Apple GPUs lack the format |
+| `MTLBlitCommandEncoder` | `copyFromBuffer:…toTexture:…destinationOrigin:` | `FOSCopyBufferToTexture` | without BC: `FOSBCDecode` on the CPU, then the decoded copy |
 | `CAMetalLayer` | `setDisplaySyncEnabled:` | `FOSLayerSetDisplaySyncEnabled` | stored; iOS always syncs |
 | `CAMetalLayer` | `displaySyncEnabled` | `FOSLayerDisplaySyncEnabled` | the stored value |
 | `MTLCommandBuffer` | `presentDrawable:` | `FOSPresentDrawable` | `presentDrawable:afterMinimumDuration:` for the FPS cap |

@@ -54,12 +54,15 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
 
 ## The app
 
-1. **SDL3 for iOS:** the iOS build and development tasks download SDL 3.4.20's official release DMG, verify its pinned
-   SHA-256 digest and extract `SDL3.xcframework` into the ignored `Vendor` directory. This works on Linux, WSL and
-   macOS; it does not require a local SDL source build. `Package.swift` embeds that framework in the app. SDL's
-   [dynamic API contract](https://wiki.libsdl.org/SDL3/README-dynapi) keeps the table order stable, appends new entries,
-   and rejects a caller whose table is larger or whose table version differs. That rejection remains part of the SDL
-   device gate.
+1. **SDL3 for iOS:** the iOS build and development tasks download SDL 3.4.20's release source, verify its pinned
+   SHA-256 digest, turn on the dynamic API in `src/dynapi/SDL_dynapi.h` and build `SDL3.xcframework` (iOS device and
+   simulator) into the ignored `Vendor` directory with `xcodebuild`, so this step needs macOS with Xcode. SDL's official
+   iOS framework can't be used: SDL compiles the dynamic API out on iOS, so it has no `SDL_DYNAPI_entry`, the game's
+   static SDL3 ignores `SDL3_DYNAMIC_API` and crashes in its own macOS (Cocoa) video backend. `Package.swift` embeds
+   the framework in the app. SDL's [dynamic API contract](https://wiki.libsdl.org/SDL3/README-dynapi) keeps the table
+   order stable, appends new entries, and rejects a caller whose table is larger or whose table version differs, so
+   the bundled SDL must be at least the game's (Factorio 2.1.24 links SDL 3.4.14). That rejection remains part of the
+   SDL device gate.
 2. **Generate the workspace:** on macOS, run `mise run xcode-project`, then open
    `xtool/FactoriOS.xcworkspace`. The generated workspace is disposable and ignored; regenerate it after package or
    packaging changes.

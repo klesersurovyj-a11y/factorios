@@ -146,14 +146,20 @@ didModifyRange_: ColorBitmapMetal::updateMipmapPixels, StagingBitmapMetal::unmap
 synchronizeResource_: MetalFrameCounters::endFrame, StagingBitmapMetal::copyFrom, ColorBitmapMetal::copyDataRawInternal
 synchronizeTexture_slice_level_: ColorBitmapMetal::generateMipmaps, ...
 isLowPower, recommendedMaxWorkingSetSize, hasUnifiedMemory: GPUDetectionMetal::getGPUInfo
-supportsBCTextureCompression: GraphicsInterfaceMetal::resolveMetalDeviceCapabilities
+supportsBCTextureCompression, isDepth24Stencil8PixelFormatSupported: GraphicsInterfaceMetal::resolveMetalDeviceCapabilities
 ```
 
 `didModifyRange:` and `synchronize*` belong to `MTLStorageModeManaged`, which iOS doesn't have. Apple GPUs share memory
 with the CPU, so on iOS these have nothing to do: the compatibility layer adds them as empty operations on the concrete
 Metal classes, and turns any request for managed storage into shared storage. `setDisplaySyncEnabled:` has no iOS
-counterpart (iOS always presents in sync with the display). `supportsBCTextureCompression` is real on iOS 16.4+, and
-the game reads it, so it falls back to uncompressed sprites where BC isn't supported **[inference]**.
+counterpart (iOS always presents in sync with the display). `isDepth24Stencil8PixelFormatSupported` is macOS-only and
+always NO on Apple GPUs, so the compatibility layer answers NO. `supportsBCTextureCompression` is real on iOS 16.4+ but
+NO on iPhone GPUs (measured on an A15), while the game's Metal renderer assumes BC everywhere: `ResourceManager`
+creates 4×4 BC placeholders unconditionally, before any setting is consulted. On such GPUs the compatibility layer
+creates BC1-BC5 textures in the uncompressed format with the same channels and decodes each
+`copyFromBuffer:…toTexture:` upload on the CPU (`FOSTextureCompression.m`; BC1-BC3 bit-exact with a Mac's GPU, BC4/5
+within 8-bit rounding), and FactoriOS sets `texture-compression-level=none` and `gpu-accelerated-compression=false`
+so the game produces no BC data on the GPU.
 
 ## SDL
 
@@ -164,6 +170,8 @@ SDL3_DYNAMIC_API: 6 occurrence(s)
 The game links SDL3 statically with the dynamic API left on. Setting `SDL3_DYNAMIC_API` to an iOS build of SDL3 routes
 every SDL call to it: window and `CAMetalLayer` (UIKit), touch, audio (CoreAudio/AVAudioSession), game controllers
 (GameController) and haptics. The static SDL's Cocoa, IOKit HID, ForceFeedback and CoreVideo code is never run.
+SDL's official iOS framework compiles the dynamic API out (`SDL_dynapi.h` sets `SDL_DYNAMIC_API 0` for
+`TARGET_OS_IPHONE`), so FactoriOS builds SDL3 from source with that switch turned on (`scripts/prepare-sdl3.sh`).
 
 On iOS, SDL expects to own the app's start-up. From SDL's source (`src/SDL.c`, `src/video/uikit/SDL_uikitappdelegate.m`,
 main branch, read 2026-11-07):

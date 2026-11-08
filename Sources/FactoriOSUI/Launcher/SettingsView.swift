@@ -58,8 +58,9 @@ struct SettingsView: View {
             Text(
                 """
                 These apply the next time Factorio starts. Resolution below Native draws fewer pixels: cooler and \
-                longer on battery. The frame keeps rounded screen corners off the game's menus. Medium sprites \
-                take much less memory, for big saves. Light graphics turn off smoke, clouds, decoratives, \
+                longer on battery. The frame keeps rounded screen corners off the game's menus. High sprites need \
+                more memory than an iPhone gives an app, and iOS closes Factorio while it loads them; Medium sprites \
+                take a quarter of that. Light graphics turn off smoke, clouds, decoratives, \
                 particles, shadows and terrain effects; turning them off again puts the effects back.
                 """
             )

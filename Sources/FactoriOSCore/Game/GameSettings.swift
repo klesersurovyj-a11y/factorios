@@ -2,9 +2,10 @@
 public struct GameSettings: Codable, Equatable, Sendable {
     /// Factorio's sprite resolution setting (`graphics-quality`).
     public enum SpriteQuality: String, Codable, CaseIterable, Sendable {
-        /// Full-resolution sprites.
+        /// Full-resolution sprites. On iPhone GPUs, which lack BC compression, their textures need about 4.3 GB; an
+        /// iPhone 14 gives an app about 3.2 GB, so iOS ends the game while it loads.
         case high
-        /// Half-resolution sprites: much less memory, for big saves or smaller devices.
+        /// Half-resolution sprites: about a quarter of the memory, which fits iPhones.
         case medium
     }
 
@@ -51,7 +52,7 @@ public struct GameSettings: Codable, Equatable, Sendable {
         resolutionScale: 100,
         frameRate: .sixty,
         frame: .off,
-        spriteQuality: .high,
+        spriteQuality: .medium,
         lightGraphics: false,
         fpsCounter: false,
         detailedLogs: false,

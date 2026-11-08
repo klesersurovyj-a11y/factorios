@@ -11,7 +11,8 @@ public enum FactorioConfig {
         "elevated-rail-shadows",
     ]
 
-    /// Returns `ini` with FactoriOS's keys set: paths, input method, UI scale, sprite quality and effects.
+    /// Returns `ini` with FactoriOS's keys set: paths, input method, UI scale, sprite quality, effects and, on GPUs
+    /// without BC formats, texture compression.
     ///
     /// The FPS counter is an app overlay fed by the runtime's Metal presentation hook, not a `config.ini` key.
     ///
@@ -20,9 +21,10 @@ public enum FactorioConfig {
     ///   - paths: Where the game's data and the player's folder are.
     ///   - settings: The player's settings.
     ///   - keyboardAndMouse: Whether a keyboard was connected, which puts Factorio in keyboard-and-mouse mode.
+    ///   - supportsBCTextures: Whether the GPU samples BC-compressed textures.
     /// - Returns: The updated text.
     public static func update(
-        _ ini: String, paths: GamePaths, settings: GameSettings, keyboardAndMouse: Bool
+        _ ini: String, paths: GamePaths, settings: GameSettings, keyboardAndMouse: Bool, supportsBCTextures: Bool
     ) -> String {
         var config = ini.hasPrefix("; version=") ? ini : versionHeader + "\n" + ini
         // Factorio derives its paths from its executable, which here is FactoriOS, so name them.
@@ -42,6 +44,12 @@ public enum FactorioConfig {
                 config = set(config, section: "graphics", key: key, value: shown)
             }
         }
+        // Factorio compresses sprites to BC, which iPhone GPUs lack: FactoriOS's Metal fixes decode BC on the CPU, so
+        // compression would save no memory, and GPU-accelerated compression writes BC data the CPU never sees.
+        if !supportsBCTextures {
+            config = set(config, section: "graphics", key: "texture-compression-level", value: "none")
+            config = set(config, section: "graphics", key: "gpu-accelerated-compression", value: "false")
+        }
         return config
     }
 
@@ -51,9 +59,12 @@ public enum FactorioConfig {
     ///   - paths: Where `config.ini` and the game's data are.
     ///   - settings: The player's settings.
     ///   - keyboardAndMouse: Whether a keyboard was connected, which puts Factorio in keyboard-and-mouse mode.
+    ///   - supportsBCTextures: Whether the GPU samples BC-compressed textures.
     /// - Returns: `settings` with `lightApplied` recording what was written; the caller saves it.
     /// - Throws: The file system's error when `config.ini` can't be read or written.
-    public static func write(paths: GamePaths, settings: GameSettings, keyboardAndMouse: Bool) throws -> GameSettings {
+    public static func write(
+        paths: GamePaths, settings: GameSettings, keyboardAndMouse: Bool, supportsBCTextures: Bool
+    ) throws -> GameSettings {
         let file = paths.config
         let old: String
         if FileManager.default.fileExists(atPath: file.path) {
@@ -61,7 +72,13 @@ public enum FactorioConfig {
         } else {
             old = ""
         }
-        let config = update(old, paths: paths, settings: settings, keyboardAndMouse: keyboardAndMouse)
+        let config = update(
+            old,
+            paths: paths,
+            settings: settings,
+            keyboardAndMouse: keyboardAndMouse,
+            supportsBCTextures: supportsBCTextures
+        )
         try FileManager.default.createDirectory(
             at: file.deletingLastPathComponent(),
             withIntermediateDirectories: true

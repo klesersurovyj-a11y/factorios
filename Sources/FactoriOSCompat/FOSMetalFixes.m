@@ -1,3 +1,4 @@
+#import "FOSTextureCompression.h"
 #import "FactoriOSCompat.h"
 
 @import Darwin;
@@ -136,6 +137,13 @@ static BOOL FOSDeviceIsLowPower(id device, SEL cmd) {
     return NO;
 }
 
+/// -[MTLDevice isDepth24Stencil8PixelFormatSupported]: whether MTLPixelFormatDepth24Unorm_Stencil8 exists, which only
+/// some Intel and AMD Macs had. Apple GPUs never support it, so the game picks Depth32Float_Stencil8.
+static BOOL FOSDeviceIsDepth24Stencil8PixelFormatSupported(id device, SEL cmd) {
+    (void)device, (void)cmd;
+    return NO;
+}
+
 static char FOSDisplaySyncKey;
 
 /// -[CAMetalLayer setDisplaySyncEnabled:]: iOS always presents in sync with the display, so the value is only kept
@@ -188,15 +196,6 @@ static void *FOSNewBufferNoCopy(id device, SEL cmd, void *bytes, NSUInteger leng
     return fosNewBufferNoCopy(device, cmd, bytes, length, FOSSharedOptions(options), deallocator);
 }
 
-static void *FOSNewTexture(id device, SEL cmd, MTLTextureDescriptor *descriptor) {
-    if ((NSUInteger)descriptor.storageMode != FOSStorageModeManaged) {
-        return fosNewTexture(device, cmd, descriptor);
-    }
-    MTLTextureDescriptor *shared = [descriptor copy];
-    shared.storageMode = MTLStorageModeShared;
-    return fosNewTexture(device, cmd, shared);
-}
-
 static void FOSSetStorageMode(id descriptor, SEL cmd, MTLStorageMode mode) {
     BOOL managed = (NSUInteger)mode == FOSStorageModeManaged;
     fosSetStorageMode(descriptor, cmd, managed ? MTLStorageModeShared : mode);
@@ -204,6 +203,93 @@ static void FOSSetStorageMode(id descriptor, SEL cmd, MTLStorageMode mode) {
 
 static void FOSSetResourceOptions(id descriptor, SEL cmd, MTLResourceOptions options) {
     fosSetResourceOptions(descriptor, cmd, FOSSharedOptions(options));
+}
+
+#pragma mark - BC texture emulation
+
+// Apple's iPhone GPUs have no BC formats (supportsBCTextureCompression is NO), yet the game creates BC textures
+// unconditionally, as every Mac it runs on samples them. On such a GPU a BC texture is created in the uncompressed
+// format with the same channels, tagged with its BC format, and every upload into it is decoded on the CPU.
+// The game uploads texels only through -copyFromBuffer:...toTexture:...destinationOrigin: from a shared staging buffer
+// it filled beforehand; FactorioConfig turns off texture compression on these GPUs, so no BC data comes from the GPU.
+
+static BOOL fosEmulateBC = NO;
+static char FOSCompressedFormatKey;
+
+typedef void (*FOSCopyBufferToTextureIMP)(id, SEL, id, NSUInteger, NSUInteger, NSUInteger, MTLSize, id, NSUInteger,
+                                          NSUInteger, MTLOrigin);
+static FOSCopyBufferToTextureIMP fosCopyBufferToTexture;
+
+/// -[MTLDevice newTextureWithDescriptor:]: managed storage becomes shared, and a BC format becomes its decoded format
+/// when the GPU lacks BC.
+static void *FOSNewTexture(id device, SEL cmd, MTLTextureDescriptor *descriptor) {
+    MTLPixelFormat format = descriptor.pixelFormat;
+    MTLPixelFormat decoded = fosEmulateBC ? FOSBCDecodedFormat(format) : MTLPixelFormatInvalid;
+    BOOL managed = (NSUInteger)descriptor.storageMode == FOSStorageModeManaged;
+    if (!managed && decoded == MTLPixelFormatInvalid) {
+        return fosNewTexture(device, cmd, descriptor);
+    }
+    MTLTextureDescriptor *adapted = [descriptor copy];
+    if (managed) {
+        adapted.storageMode = MTLStorageModeShared;
+    }
+    if (decoded == MTLPixelFormatInvalid) {
+        return fosNewTexture(device, cmd, adapted);
+    }
+    adapted.pixelFormat = decoded;
+    void *texture = fosNewTexture(device, cmd, adapted);
+    if (texture != NULL) {
+        objc_setAssociatedObject((__bridge id)texture, &FOSCompressedFormatKey,
+                                 [NSNumber numberWithUnsignedInteger:format], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return texture;
+}
+
+/// Decodes `size` texels of BC `format` from `buffer` into a new shared buffer of the decoded format, rows packed;
+/// nil, logged, when the source isn't CPU-visible or lies outside the buffer.
+static id<MTLBuffer> _Nullable FOSDecodeUpload(id<MTLDevice> device, id<MTLBuffer> buffer, NSUInteger offset,
+                                               NSUInteger bytesPerRow, NSUInteger bytesPerImage, MTLSize size,
+                                               MTLPixelFormat format) {
+    NSUInteger blockRows = (size.height + 3) / 4;
+    NSUInteger sourceImage = size.depth > 1 ? bytesPerImage : blockRows * bytesPerRow;
+    const uint8_t *source = (const uint8_t *)buffer.contents;
+    if (source == NULL || size.depth == 0 ||
+        offset + ((size.depth - 1) * sourceImage) + (blockRows * bytesPerRow) > buffer.length) {
+        NSLog(@"FactoriOS: can't decode a BC upload of %lux%lu (CPU-visible: %d)", (unsigned long)size.width,
+              (unsigned long)size.height, source != NULL);
+        return nil;
+    }
+    NSUInteger rowBytes = size.width * FOSBCDecodedBytesPerPixel(format);
+    NSUInteger imageBytes = rowBytes * size.height;
+    id<MTLBuffer> decoded = [device newBufferWithLength:imageBytes * size.depth options:MTLResourceStorageModeShared];
+    uint8_t *destination = (uint8_t *)decoded.contents;
+    for (NSUInteger image = 0; image < size.depth; image++) {
+        FOSBCDecode(format, source + offset + (image * sourceImage), bytesPerRow, size.width, size.height,
+                    destination + (image * imageBytes), rowBytes);
+    }
+    return decoded;
+}
+
+/// -[MTLBlitCommandEncoder copyFromBuffer:...toTexture:...destinationOrigin:]: an upload into an emulated BC texture
+/// copies the decoded texels instead. The command buffer retains the decoded buffer until the copy has run.
+static void FOSCopyBufferToTexture(id encoder, SEL cmd, id buffer, NSUInteger offset, NSUInteger bytesPerRow,
+                                   NSUInteger bytesPerImage, MTLSize size, id texture, NSUInteger slice,
+                                   NSUInteger level, MTLOrigin origin) {
+    NSNumber *compressed = objc_getAssociatedObject(texture, &FOSCompressedFormatKey);
+    if (compressed == nil) {
+        fosCopyBufferToTexture(encoder, cmd, buffer, offset, bytesPerRow, bytesPerImage, size, texture, slice, level,
+                               origin);
+        return;
+    }
+    MTLPixelFormat format = (MTLPixelFormat)compressed.unsignedIntegerValue;
+    id<MTLBuffer> decoded = FOSDecodeUpload(((id<MTLCommandEncoder>)encoder).device, buffer, offset, bytesPerRow,
+                                            bytesPerImage, size, format);
+    if (decoded == nil) {
+        return;
+    }
+    NSUInteger rowBytes = size.width * FOSBCDecodedBytesPerPixel(format);
+    fosCopyBufferToTexture(encoder, cmd, decoded, 0, rowBytes, rowBytes * size.height, size, texture, slice, level,
+                           origin);
 }
 
 #pragma mark - Presentation swizzles
@@ -246,13 +332,15 @@ static void *FOSNextDrawable(id layer, SEL cmd) {
 
 #pragma mark - Installation
 
-/// Live objects of the classes the fixes go on. Classes live for the process, so the fields needn't retain them.
+/// Live objects of the classes the fixes go on, and the GPU's BC support. Classes live for the process, so the fields
+/// needn't retain them.
 typedef struct {
     __unsafe_unretained Class device;
     __unsafe_unretained Class buffer;
     __unsafe_unretained Class commandBuffer;
     __unsafe_unretained Class blitEncoder;
     __unsafe_unretained Class textureDescriptor;
+    BOOL supportsBC;
 } FOSMetalClasses;
 
 static BOOL FOSProbeMetalClasses(FOSMetalClasses *classes) {
@@ -271,6 +359,7 @@ static BOOL FOSProbeMetalClasses(FOSMetalClasses *classes) {
     classes->commandBuffer = object_getClass(commandBuffer);
     classes->blitEncoder = object_getClass(blitEncoder);
     classes->textureDescriptor = object_getClass(descriptor);
+    classes->supportsBC = device.supportsBCTextureCompression;
     return YES;
 }
 
@@ -290,11 +379,28 @@ static void FOSInstallStorageFixes(const FOSMetalClasses *classes) {
         classes->textureDescriptor, sel_registerName("setResourceOptions:"), (IMP)FOSSetResourceOptions);
 }
 
+/// Turns on BC emulation when the GPU lacks BC; FOSNewTexture checks the flag, the upload hook goes on the encoder.
+static void FOSInstallBCEmulation(const FOSMetalClasses *classes) {
+    if (classes->supportsBC) {
+        return;
+    }
+    fosCopyBufferToTexture = (FOSCopyBufferToTextureIMP)FOSSwizzle(
+        classes->blitEncoder,
+        sel_registerName("copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:"
+                         "destinationSlice:destinationLevel:destinationOrigin:"),
+        (IMP)FOSCopyBufferToTexture);
+    fosEmulateBC = fosCopyBufferToTexture != NULL;
+}
+
 static void FOSInstallMissingMethods(const FOSMetalClasses *classes) {
     FOSAddMethod(classes->buffer, "didModifyRange:", (IMP)FOSBufferDidModifyRange, "v@:{_NSRange=QQ}");
     FOSAddMethod(classes->blitEncoder, "synchronizeResource:", (IMP)FOSBlitSynchronizeResource, "v@:@");
     FOSAddMethod(classes->blitEncoder, "synchronizeTexture:slice:level:", (IMP)FOSBlitSynchronizeTexture, "v@:@QQ");
     FOSAddMethod(classes->device, "isLowPower", (IMP)FOSDeviceIsLowPower, "B@:");
+    FOSAddMethod(
+        classes->device, "isDepth24Stencil8PixelFormatSupported", (IMP)FOSDeviceIsDepth24Stencil8PixelFormatSupported,
+        "B@:"
+    );
     Class layer = [CAMetalLayer class];
     FOSAddMethod(layer, "setDisplaySyncEnabled:", (IMP)FOSLayerSetDisplaySyncEnabled, "v@:B");
     FOSAddMethod(layer, "displaySyncEnabled", (IMP)FOSLayerDisplaySyncEnabled, "B@:");
@@ -310,13 +416,14 @@ static void FOSInstallPresentationFixes(const FOSMetalClasses *classes) {
 void FOSCompatInstallMetalFixes(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        FOSMetalClasses classes = {Nil, Nil, Nil, Nil, Nil};
+        FOSMetalClasses classes = {Nil, Nil, Nil, Nil, Nil, YES};
         if (!FOSProbeMetalClasses(&classes)) {
             // No Metal device: the game can't render at all and reports that itself.
             NSLog(@"FactoriOS: no Metal device; Metal fixes not installed");
             return;
         }
         FOSInstallStorageFixes(&classes);
+        FOSInstallBCEmulation(&classes);
         FOSInstallMissingMethods(&classes);
         FOSInstallPresentationFixes(&classes);
     });
