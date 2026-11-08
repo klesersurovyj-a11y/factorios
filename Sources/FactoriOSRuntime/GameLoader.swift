@@ -28,10 +28,9 @@ struct GameLoader {
     /// dlopens the library (running its initializers), patches every recorded slot and finds the entry point.
     static func load(library: URL, manifest: SymbolSlotManifest) throws -> Self {
         // Load order: dlopen runs the game's initializers before any slot points at the compatibility layer. That is
-        // safe because scripts/inspect-binary's load-time report shows the 2.1.23 demo's 448 __mod_init_func
-        // initializers reach no Mac-only or replaced import and the image has no +load methods (`mise run inspect`
-        // reports both). Slots are then filled with vm_protect, since __DATA_CONST is
-        // read-only after binding, and only then is the entry called.
+        // safe because the 2.1.23 demo's 448 __mod_init_func initializers reach no Mac-only or replaced import and the
+        // image has no +load methods. Slots are then filled with vm_protect, since __DATA_CONST is read-only after
+        // binding, and only then is the entry called.
         // The handle is never closed: the game stays loaded until the process exits.
         guard dlopen(library.path, RTLD_NOW | RTLD_LOCAL) != nil else {
             throw GameLaunchError.loadFailed(dlerror().map { String(cString: $0) } ?? "unknown dyld error")

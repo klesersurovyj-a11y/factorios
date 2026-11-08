@@ -15,7 +15,6 @@ Start with [Getting started](getting-started.md). Then read [Architecture](archi
 | `mise run check` | SwiftLint, swift-format, the compatibility map check, repository lint, `FactoriOSCore` build |
 | `mise run check-ios` | clang-tidy on the Objective-C, and the iOS device and simulator compile |
 | `mise run format` | Rewrites Swift sources with swift-format |
-| `mise run inspect` | Reports what a Factorio build needs from macOS (see [below](#new-factorio-versions)) |
 
 Run `check` and `check-ios` before you open a pull request. CI (`.github/workflows/ci.yml`) runs `check` on Ubuntu and
 `check-ios` on macOS.
@@ -26,7 +25,7 @@ Run `check` and `check-ios` before you open a pull request. CI (`.github/workflo
 |---|---|
 | `Sources/` | The Swift package's modules ([Architecture](architecture.md#modules)) |
 | `Resources/` | `Info.plist`, entitlements, app icon |
-| `scripts/` | `setup`, `device`, `simulator`, SDL3 build, binary inspector, compatibility map check |
+| `scripts/` | `setup`, `device`, `simulator`, SDL3 build, compatibility map check |
 | `xtool.yml` | xtool's app description; `mise run xcode-project` turns the package into an Xcode project |
 | `artifact/` | Ignored: DerivedData, the prepared game, local disk images |
 | `Vendor/`, `xtool/` | Ignored: the built SDL3 framework and the generated workspace |
@@ -41,8 +40,8 @@ game library, so the launcher shows its welcome screen. Use `mise run device` to
 
 - Swift 6 with warnings as errors. Objective-C with `-Weverything -Werror`. SwiftLint and swift-format are strict.
 - `FactoriOSCore` stays platform-independent and builds on Linux. Put logic there and keep UIKit/Metal code thin.
-- A Mac API replacement goes into `Sources/FactoriOSCompat`, the symbol list in `scripts/inspect-binary`, and a row of
-  the [compatibility map](architecture.md#compatibility-map). `check` verifies the map.
+- A Mac API replacement goes into `Sources/FactoriOSCompat`, `GameLibrary.redirectedSymbols` when it fills a slot, and
+  a row of the [compatibility map](architecture.md#compatibility-map). `check` verifies the map.
 
 ## On-device debugging
 
@@ -67,17 +66,6 @@ To attach lldb, launch with `xcrun devicectl device process launch --device $DEV
 20 seconds.
 
 **Detailed logs** in the launcher's settings turn on Metal validation and verbose SDL logging.
-
-## New Factorio versions
-
-```sh
-mise run inspect                       # uses $FACTORIOS_DMG
-mise run inspect -- path/to/factorio   # or an extracted executable
-```
-
-The report lists the Mac-only imports the game's own code reaches, the code that runs while the library loads (before
-the compatibility slots are filled), process control calls, and Metal selectors that differ on iOS. Anything new that
-isn't in the [compatibility map](architecture.md#compatibility-map) needs a replacement before the version can run.
 
 ## Updating SDL3
 

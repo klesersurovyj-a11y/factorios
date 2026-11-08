@@ -16,7 +16,7 @@ public final class GameInstallation {
 
     /// Reads the state of the installation in `paths`.
     public init(paths: GamePaths) {
-        if let game = GameImporter.installedGame(paths: paths), GameLibrary.isBundled(paths: paths) {
+        if let game = ImportedGame.installed(paths: paths), GameLibrary.isBundled(paths: paths) {
             stage = .ready(game)
         } else {
             stage = .notInstalled

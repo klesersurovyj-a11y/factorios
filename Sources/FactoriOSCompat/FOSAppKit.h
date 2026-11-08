@@ -1,6 +1,6 @@
 // The Mac-only AppKit and Foundation classes Factorio's binary references, rebuilt on ImageIO, CoreGraphics and UIKit.
 // The loader points the game's class references for NSAppleEventManager, NSBitmapImageRep, NSColorSpace and
-// NSWorkspace at these classes, so they answer exactly the selectors the game sends (`mise run inspect` lists them).
+// NSWorkspace at these classes, so they answer exactly the selectors the game sends.
 
 #ifndef FACTORIOS_FOS_APP_KIT_H
 #define FACTORIOS_FOS_APP_KIT_H

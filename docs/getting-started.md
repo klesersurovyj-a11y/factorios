@@ -68,16 +68,16 @@ candidates it lists them, and you choose with a flag: `mise run setup -- --devic
 mise run device
 ```
 
-The first run takes a while: it builds SDL3 from source, the app, and the Mac prepare tool, imports the disk image and
+The first run takes a while: it builds SDL3 from source, the app, and the Mac converter, imports the disk image and
 converts the game. Later runs reuse all of that and copy only changed game files.
 
 ```mermaid
 sequenceDiagram
     participant X as Xcode
-    participant P as factorios-prepare
+    participant P as scripts/device
     participant D as Device
     X->>X: build and sign FactoriOS (automatic signing)
-    P->>P: import .dmg, convert factorio to factorio.dylib
+    P->>P: mount .dmg, copy factorio.app, factorios-convert to factorio.dylib
     P->>P: codesign it with the app's certificate
     X->>X: embed the dylib, re-sign the app
     X->>D: install the app
@@ -96,7 +96,6 @@ Factorio. [Playing](playing.md) covers the controls.
 - **Free accounts:** the provisioning profile expires after 7 days, and the app then stops launching. Run
   `mise run device` again; your saves stay. A free account allows 3 devices and 3 sideloaded apps per device.
 - **New Factorio version:** download the new `.dmg`, run `mise run setup` (it picks the newest image when the
-  configured one is gone, or pass `--dmg`), then `mise run device`. Run `mise run inspect` first if the game's
-  Mac-only API use might have changed ([Development](development.md#new-factorio-versions)).
+  configured one is gone, or pass `--dmg`), then `mise run device`.
 
 Something failed? See [Troubleshooting](troubleshooting.md).

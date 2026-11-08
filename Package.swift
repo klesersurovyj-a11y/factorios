@@ -28,11 +28,11 @@ let core: Target = .target(
 // sees every target.
 let coreOnly = Context.environment["FACTORIOS_CORE_ONLY"] != nil
 
-// The development Mac's command that imports, converts and signs the game before it is copied to a device. It only
-// exists in the host build, so xtool's iOS project never sees a macOS executable.
+// The development Mac's command that converts the imported game before scripts/device signs it and copies it to a
+// device. It only exists in the host build, so xtool's iOS project never sees a macOS executable.
 let hostTargets: [Target] =
     coreOnly
-    ? [.executableTarget(name: "FactoriOSPrepare", dependencies: ["FactoriOSCore"], swiftSettings: strictSwift)]
+    ? [.executableTarget(name: "FactoriOSConvert", dependencies: ["FactoriOSCore"], swiftSettings: strictSwift)]
     : []
 
 // SDL3's Apple XCFramework, built from SDL's pinned source with the dynamic API on, is prepared by the iOS build and
@@ -65,7 +65,7 @@ let products: [Product] =
     coreOnly
     ? [
         .library(name: "FactoriOSCore", targets: ["FactoriOSCore"]),
-        .executable(name: "factorios-prepare", targets: ["FactoriOSPrepare"]),
+        .executable(name: "factorios-convert", targets: ["FactoriOSConvert"]),
     ]
     : [.library(name: "FactoriOS", targets: ["FactoriOSApp"])]
 

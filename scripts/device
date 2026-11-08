@@ -20,14 +20,61 @@ xcodebuild \
     DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
     build
 
-# The SHA-1 of the certificate Xcode signed the app with: codesign's name for that identity.
 certificates=$(mktemp -d)
-trap 'rm -rf "$certificates"' EXIT
+volume=$(mktemp -d)
+staging="$game/Game/factorio.app.importing"
+cleanup() {
+    hdiutil detach -quiet -force "$volume" 2>/dev/null || true
+    rmdir "$volume" 2>/dev/null || true
+    rm -rf "$certificates" "$staging"
+}
+trap cleanup EXIT
+
+# The SHA-1 of the certificate Xcode signed the app with: codesign's name for that identity.
 codesign -d --extract-certificates="$certificates/cert" "$app" 2>/dev/null
 identity=$(shasum -a 1 "$certificates/cert0" | cut -d ' ' -f 1)
 
-# Imports the disk image (skipped while it is unchanged), converts the game and signs the library.
-FACTORIOS_CORE_ONLY=1 swift run -c release factorios-prepare --dmg "$dmg" --output "$game" --identity "$identity"
+# Imports factorio.app from the disk image, unless the same image was imported last time.
+source_stamp="$(cd -- "$(dirname -- "$dmg")" && pwd)/$(basename -- "$dmg") $(stat -f '%z %m' "$dmg")"
+if [ -f "$game/Game/game.json" ] && [ "$(cat "$game.source" 2>/dev/null)" = "$source_stamp" ]; then
+    echo "Using the game already imported from $(basename -- "$dmg")"
+else
+    echo "Importing $(basename -- "$dmg")"
+    hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$volume" "$dmg" >/dev/null
+    source_app=$(find "$volume" -mindepth 1 -maxdepth 2 -type d -iname factorio.app -print -quit)
+    if [ -z "$source_app" ]; then
+        echo "no factorio.app in $dmg" >&2
+        exit 1
+    fi
+    mkdir -p "$game/Game"
+    rm -rf "$staging"
+    rsync -a --exclude '*.dSYM' "$source_app/" "$staging/"
+    hdiutil detach -quiet "$volume"
+    contents="$staging/Contents"
+    if [ ! -f "$contents/MacOS/factorio" ]; then
+        echo "$(basename -- "$dmg") has no factorio.app/Contents/MacOS/factorio" >&2
+        exit 1
+    fi
+    version=$(plutil -extract version raw -o - "$contents/data/base/info.json")
+    case $version in
+    '' | *[!0-9A-Za-z.+-]*)
+        echo "unreadable game version in data/base/info.json: $version" >&2
+        exit 1
+        ;;
+    esac
+    is_demo=false
+    case $(plutil -extract CFBundleDisplayName raw -o - "$contents/Info.plist" 2>/dev/null || true) in
+    *Demo*) is_demo=true ;;
+    esac
+    rm -rf "$game/Game/game.json" "$game/Game/factorio.app"
+    mv "$staging" "$game/Game/factorio.app"
+    printf '{"isDemo":%s,"version":"%s"}\n' "$is_demo" "$version" >"$game/Game/game.json"
+    printf '%s\n' "$source_stamp" >"$game.source"
+fi
+
+echo "Converting Factorio $(plutil -extract version raw -o - "$game/Game/game.json")"
+FACTORIOS_CORE_ONLY=1 swift run -c release factorios-convert "$game"
+codesign --force --sign "$identity" --identifier factorio --timestamp=none "$game/Converted/factorio.dylib"
 
 mkdir -p "$app/Frameworks"
 cp "$game/Converted/factorio.dylib" "$app/Frameworks/factorio.dylib"

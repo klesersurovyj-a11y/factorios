@@ -5,7 +5,6 @@ swift = "6.4.2"
 swiftlint = "0.65.1"
 python = "3.12"
 uv = "0.13.7"
-"aqua:ip7z/7zip" = "26.05"
 "pipx:clang-tidy" = "23.1.4"
 "github:jdx/jactionlint" = "2.5.0"
 shellcheck = "0.11.0"
@@ -18,9 +17,6 @@ linux-arm64 = { asset_pattern = "xtool-aarch64.AppImage", format = "raw", bin = 
 linux-x64 = { asset_pattern = "xtool-x86_64.AppImage", format = "raw", bin = "xtool" }
 macos-arm64 = { asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
 macos-x64 = { asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
-
-[env]
-_.python.venv = { path = ".venv", create = true }
 
 # Playing
 
@@ -62,13 +58,6 @@ depends = ["tidy", "build-ios"]
 description = "Rewrites Swift sources with swift-format"
 run = "swift format format --in-place --recursive --parallel Package.swift Sources"
 
-[tasks.inspect]
-description = "Lists what a Factorio build needs from macOS ($FACTORIOS_DMG or the path given)"
-run = [
-  "uv pip install --quiet --requirement scripts/requirements.txt",
-  "python3 scripts/inspect-binary",
-]
-
 # Parts of check and check-ios
 
 [tasks.lint]
@@ -96,7 +85,7 @@ description = "Workflows, shell and Python scripts, property lists"
 run = [
   "jactionlint",
   "shellcheck scripts/device scripts/simulator scripts/prepare-sdl3.sh",
-  "PYTHONPYCACHEPREFIX=\"${TMPDIR:-/tmp}/factorios-pycache\" python3 -m py_compile scripts/setup scripts/inspect-binary scripts/check-architecture",
+  "PYTHONPYCACHEPREFIX=\"${TMPDIR:-/tmp}/factorios-pycache\" python3 -m py_compile scripts/setup scripts/check-architecture",
   "python3 -c 'import plistlib, sys; [plistlib.load(open(p, \"rb\")) for p in sys.argv[1:]]' Resources/*.plist Resources/*.entitlements",
 ]
 

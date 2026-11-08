@@ -12,34 +12,35 @@ flowchart TB
     App --> SDL[SDL3.xcframework<br/>built from source, dynamic API on]
     UI --> Runtime[FactoriOSRuntime<br/>install check, load, launch, input]
     UI --> Core
-    Runtime --> Core[FactoriOSCore<br/>disk image, Mach-O, settings, controls<br/>platform-independent]
+    Runtime --> Core[FactoriOSCore<br/>Mach-O, settings, controls<br/>platform-independent]
     Runtime --> Compat[FactoriOSCompat<br/>Objective-C: Mac APIs on UIKit/Metal, SDL bridge]
-    Prepare[FactoriOSPrepare<br/>Mac CLI: factorios-prepare] --> Core
+    Convert[FactoriOSConvert<br/>Mac CLI: factorios-convert] --> Core
 ```
 
 | Module | Main types |
 |---|---|
-| `FactoriOSCore/DiskImage` | `UDIFImage`, `BZip2`, `Inflate`, `HFSPlusVolume`, `GameImporter` |
 | `FactoriOSCore/MachO` | `GameConverter`, `LoadCommandRewriter`, `BindStreamWalker`, `FatBinary` |
 | `FactoriOSCore/Game` | `GamePaths`, `GameLibrary`, `GameSettings`, `FactorioConfig`, `SaveLibrary`, `PadLayout`, `PadController`, `TouchGestures` |
 | `FactoriOSRuntime` | `AppEntry`, `GameInstallation`, `LaunchCoordinator`, `GameLoader`, `CompatTable`, `GameSession`, `SDLGameInput` |
 | `FactoriOSCompat` | `FOSReplacements.m`, `FOSMetalFixes.m`, `FOSTextureCompression.m`, `FOSSDL.m`, `FOSWindowFrame.m` |
 | `FactoriOSUI` | `LauncherScene`, `HomeView`, `SettingsView`, `OverlayViewController`, `PadView`, `GameTouchView` |
-| `FactoriOSPrepare` | `main.swift`: import, convert, `codesign` |
+| `FactoriOSConvert` | `main.swift`: `GameLibrary.convert`, `GameLibrary.write` |
 
-`FACTORIOS_CORE_ONLY=1` hides the Apple-only targets so `FactoriOSCore` and `factorios-prepare` build on the host.
+`FACTORIOS_CORE_ONLY=1` hides the Apple-only targets so `FactoriOSCore` and `factorios-convert` build on the host.
 
 ## Preparing the game on the Mac
 
 ```mermaid
 flowchart LR
-    dmg[factorio .dmg] -->|UDIF, bzip2/zlib| hfs[HFS+ volume]
-    hfs -->|extract| app[factorio.app]
+    dmg[factorio .dmg] -->|hdiutil attach, rsync| app[factorio.app]
     app -->|arm64 slice| conv[GameConverter]
     conv --> dylib[factorio.dylib]
     conv --> slots[slots.json<br/>pointer slots of replaced symbols]
     dylib -->|codesign with the app's certificate| signed[signed dylib]
 ```
+
+[`scripts/device`](../scripts/device) does every step: macOS mounts the disk image, `factorios-convert` converts, and
+`codesign` signs.
 
 The converter's changes to the arm64 slice:
 
@@ -82,8 +83,8 @@ sequenceDiagram
   build compiles the dynamic API out, so `scripts/prepare-sdl3.sh` builds it from source with the switch on.
 - **One run per process:** the game's static state can't be reset, so the app exits when the game ends. An `execv`
   restart request becomes a "reopen FactoriOS" prompt.
-- **Load-time safety:** `dlopen` runs 449 static initializers before the slots are filled. `mise run inspect` follows
-  their calls and confirms they reach no replaced symbol.
+- **Load-time safety:** `dlopen` runs 449 static initializers before the slots are filled. None of them reaches a
+  replaced symbol.
 - **Background:** iOS forbids GPU work in the background, so `nextDrawable` waits until the app is active again.
 - **Paths:** `config.ini` sets `read-data` to the imported game and `write-data` to `Documents/Factorio`, which the
   Files app shows.
@@ -162,4 +163,3 @@ a macOS binary for iOS.
 | On-screen controller, gestures, layout editor | Verified |
 | Physical controllers | Unverified |
 | Restart prompt (`execv`) | Unverified |
-| Disk image paths not in the 2.1.24 image (hard links, extents overflow, compressed files) | Implemented, never run on real data |

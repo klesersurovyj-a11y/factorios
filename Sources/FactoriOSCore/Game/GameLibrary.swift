@@ -1,11 +1,9 @@
 public import Foundation
 
-/// The converted game library FactoriOS loads, which the Mac prepare tool builds.
+/// The converted game library FactoriOS loads, which the Mac converter builds.
 public enum GameLibrary {
     /// The converted library's install name (LC_ID_DYLIB).
     public static let installName = "@rpath/factorio.dylib"
-    /// The code-signing identifier of the converted library.
-    public static let signingIdentifier = "factorio"
 
     /// The symbols whose pointer slots the converter records and the compatibility layer fills in.
     ///
