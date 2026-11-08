@@ -20,10 +20,6 @@ let strictObjC: [CSetting] = [
 
 let core: Target = .target(
     name: "FactoriOSCore",
-    dependencies: [
-        .product(name: "Crypto", package: "swift-crypto"),
-        .product(name: "SwiftASN1", package: "swift-asn1"),
-    ],
     swiftSettings: strictSwift
 )
 
@@ -49,7 +45,7 @@ let appleTargets: [Target] =
         .binaryTarget(name: "SDL3", path: "Vendor/SDL3.xcframework"),
         // The game's Mac-only API surface on UIKit/Metal, and the SDL3 bridge.
         .target(name: "FactoriOSCompat", cSettings: strictObjC),
-        // Signing, loading and running the converted game.
+        // Loading and running the converted game.
         .target(
             name: "FactoriOSRuntime",
             dependencies: ["FactoriOSCore", "FactoriOSCompat"],
@@ -77,9 +73,5 @@ let package = Package(
     name: "FactoriOS",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: products,
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
-        .package(url: "https://github.com/apple/swift-asn1.git", from: "1.7.4"),
-    ],
     targets: [core] + hostTargets + appleTargets
 )

@@ -18,7 +18,7 @@ public struct SettingsStore: Sendable {
             // A missing file is a fresh install; an unreadable one (from a different version) starts over too.
             return .defaults
         }
-        return Self.offered(settings)
+        return settings
     }
 
     /// Saves `settings`, replacing the file in one step.
@@ -31,16 +31,5 @@ public struct SettingsStore: Sendable {
             withIntermediateDirectories: true
         )
         try data.write(to: file, options: .atomic)
-    }
-
-    /// A saved resolution scale that's no longer offered becomes the nearest one that is.
-    private static func offered(_ settings: GameSettings) -> GameSettings {
-        var settings = settings
-        let scales = GameSettings.resolutionScales
-        if !scales.contains(settings.resolutionScale) {
-            let nearest = scales.min { abs($0 - settings.resolutionScale) < abs($1 - settings.resolutionScale) }
-            settings.resolutionScale = nearest ?? GameSettings.defaults.resolutionScale
-        }
-        return settings
     }
 }

@@ -1,6 +1,7 @@
 #import "FOSSDL.h"
 
 @import Darwin;
+@import ObjectiveC;
 
 NSErrorDomain const FOSSDLErrorDomain = @"FOSSDLErrorDomain";
 
@@ -77,7 +78,6 @@ _Static_assert(sizeof(FOSSDLEvent) == 128, "SDL_Event size");
 /// The SDL3 functions the bridge calls.
 typedef struct {
     int (*RunApp)(int argc, char *_Nullable *_Nonnull argv, FOSSDLMainFunction mainFunction, void *_Nullable reserved);
-    void (*SetMainReady)(void);
     bool (*SetHint)(const char *name, const char *value);
     const char *(*GetError)(void);
     bool (*InitSubSystem)(uint32_t flags);
@@ -92,10 +92,9 @@ typedef struct {
     void (*WarpMouseInWindow)(FOSSDLWindow *_Nullable window, float x, float y);
     uint32_t (*GetMouseState)(float *_Nullable x, float *_Nullable y);
     bool (*PushEvent)(FOSSDLEvent *event);
-    bool (*StartTextInput)(FOSSDLWindow *window);
-    bool (*StopTextInput)(FOSSDLWindow *window);
     void (*Free)(void *_Nullable memory);
     uint32_t (*GetWindowProperties)(FOSSDLWindow *window);
+    float (*GetWindowPixelDensity)(FOSSDLWindow *window);
     void *_Nullable (*GetPointerProperty)(uint32_t props, const char *name, void *_Nullable defaultValue);
 } FOSSDLFunctions;
 
@@ -129,7 +128,6 @@ static void *_Nullable FOSSDLSymbol(void *handle, const char *name, NSMutableArr
 static void FOSSDLResolve(void *handle, NSMutableArray<NSString *> *missing) {
     fosSDL.RunApp = (int (*)(int, char *_Nullable *_Nonnull, FOSSDLMainFunction, void *_Nullable))FOSSDLSymbol(
         handle, "SDL_RunApp", missing);
-    fosSDL.SetMainReady = (void (*)(void))FOSSDLSymbol(handle, "SDL_SetMainReady", missing);
     fosSDL.SetHint = (bool (*)(const char *, const char *))FOSSDLSymbol(handle, "SDL_SetHint", missing);
     fosSDL.GetError = (const char *(*)(void))FOSSDLSymbol(handle, "SDL_GetError", missing);
     fosSDL.InitSubSystem = (bool (*)(uint32_t))FOSSDLSymbol(handle, "SDL_InitSubSystem", missing);
@@ -150,14 +148,60 @@ static void FOSSDLResolve(void *handle, NSMutableArray<NSString *> *missing) {
     fosSDL.GetMouseState = (uint32_t (*)(float *_Nullable, float *_Nullable))FOSSDLSymbol(
         handle, "SDL_GetMouseState", missing);
     fosSDL.PushEvent = (bool (*)(FOSSDLEvent *))FOSSDLSymbol(handle, "SDL_PushEvent", missing);
-    fosSDL.StartTextInput = (bool (*)(FOSSDLWindow *))FOSSDLSymbol(handle, "SDL_StartTextInput", missing);
-    fosSDL.StopTextInput = (bool (*)(FOSSDLWindow *))FOSSDLSymbol(handle, "SDL_StopTextInput", missing);
     fosSDL.Free = (void (*)(void *_Nullable))FOSSDLSymbol(handle, "SDL_free", missing);
     fosSDL.GetWindowProperties = (uint32_t (*)(FOSSDLWindow *))FOSSDLSymbol(
         handle, "SDL_GetWindowProperties", missing);
     fosSDL.GetPointerProperty = (void *_Nullable (*)(uint32_t, const char *, void *_Nullable))FOSSDLSymbol(
         handle, "SDL_GetPointerProperty", missing);
+    fosSDL.GetWindowPixelDensity = (float (*)(FOSSDLWindow *))FOSSDLSymbol(
+        handle, "SDL_GetWindowPixelDensity", missing);
 }
+
+static void FOSSDLWithFirstWindow(void (^body)(FOSSDLWindow *window));
+
+/// SDL_Rect.
+typedef struct {
+    int x;
+    int y;
+    int w;
+    int h;
+} FOSSDLRect;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-strict"
+
+typedef void (*FOSSetTextInputRectIMP)(id, SEL, FOSSDLRect);
+static FOSSetTextInputRectIMP fosSetTextInputRect = NULL;
+
+/// -[SDL_uikitviewcontroller setTextInputRect:]. SDL lifts its view above the keyboard so the game's focused text
+/// field stays visible, measuring the field in the window's points; the game, rendering at native resolution, gives
+/// it in its drawable's pixels, which would lift the view off the screen. The rect is turned into points first.
+static void FOSSDLSetTextInputRect(id controller, SEL cmd, FOSSDLRect rect) {
+    __block float density = 1;
+    FOSSDLWithFirstWindow(^(FOSSDLWindow *window) {
+        density = fosSDL.GetWindowPixelDensity(window);
+    });
+    if (density > 1) {
+        rect.x = (int)lroundf((float)rect.x / density);
+        rect.y = (int)lroundf((float)rect.y / density);
+        rect.w = (int)lroundf((float)rect.w / density);
+        rect.h = (int)lroundf((float)rect.h / density);
+    }
+    fosSetTextInputRect(controller, cmd, rect);
+}
+
+/// Routes SDL's view controller's setTextInputRect: through FOSSDLSetTextInputRect, once.
+static void FOSSDLInstallTextInputRectFix(void) {
+    Class cls = NSClassFromString(@"SDL_uikitviewcontroller");
+    Method method = cls != Nil ? class_getInstanceMethod(cls, sel_registerName("setTextInputRect:")) : NULL;
+    if (method == NULL || fosSetTextInputRect != NULL) {
+        // An SDL without the on-screen keyboard's view lift, or already installed.
+        return;
+    }
+    fosSetTextInputRect = (FOSSetTextInputRectIMP)method_setImplementation(method, (IMP)FOSSDLSetTextInputRect);
+}
+
+#pragma clang diagnostic pop
 
 BOOL FOSSDLLoad(NSString *path, NSError *_Nullable *_Nullable error) {
     if (fosSDLLoaded) {
@@ -184,15 +228,12 @@ BOOL FOSSDLLoad(NSString *path, NSError *_Nullable *_Nullable error) {
         return NO;
     }
     fosSDLLoaded = YES;
+    FOSSDLInstallTextInputRectFix();
     return YES;
 }
 
 int FOSSDLRunApp(int argc, char *_Nullable *_Nonnull argv, FOSSDLMainFunction mainFunction) {
     return fosSDL.RunApp(argc, argv, mainFunction, NULL);
-}
-
-void FOSSDLSetMainReady(void) {
-    fosSDL.SetMainReady();
 }
 
 BOOL FOSSDLSetHint(NSString *name, NSString *value) {
@@ -202,6 +243,19 @@ BOOL FOSSDLSetHint(NSString *name, NSString *value) {
 NSString *FOSSDLLastError(void) {
     const char *message = fosSDL.GetError();
     return message != NULL ? FOSStringFromUTF8(message) : @"";
+}
+
+/// Closes and detaches the virtual gamepad, if one is attached.
+static void FOSSDLDetachVirtualGamepad(void) {
+    if (fosGamepad != NULL) {
+        fosSDL.CloseJoystick(fosGamepad);
+        fosGamepad = NULL;
+    }
+    if (fosGamepadID != 0) {
+        fosSDL.DetachVirtualJoystick(fosGamepadID);
+        fosGamepadID = 0;
+    }
+    fosRumbleHandler = nil;
 }
 
 /// SDL_VirtualJoystickDesc.Rumble: forwards SDL's 16-bit strengths to the handler as 0...1.
@@ -252,18 +306,6 @@ BOOL FOSSDLAttachVirtualGamepad(NSString *name, void (^_Nullable rumble)(float l
     return YES;
 }
 
-void FOSSDLDetachVirtualGamepad(void) {
-    if (fosGamepad != NULL) {
-        fosSDL.CloseJoystick(fosGamepad);
-        fosGamepad = NULL;
-    }
-    if (fosGamepadID != 0) {
-        fosSDL.DetachVirtualJoystick(fosGamepadID);
-        fosGamepadID = 0;
-    }
-    fosRumbleHandler = nil;
-}
-
 void FOSSDLSetGamepadButton(NSInteger button, BOOL pressed) {
     if (fosGamepad != NULL && button >= 0 && button < FOSSDLGamepadButtons) {
         fosSDL.SetJoystickVirtualButton(fosGamepad, (int)button, pressed);
@@ -312,14 +354,65 @@ void FOSSDLScrollWheel(float notches) {
     });
 }
 
-void FOSSDLSetTextInputActive(BOOL active) {
-    FOSSDLWithFirstWindow(^(FOSSDLWindow *window) {
-        if (active) {
-            fosSDL.StartTextInput(window);
-        } else {
-            fosSDL.StopTextInput(window);
+/// The first text field in `view`'s hierarchy, searched breadth first.
+static UITextField *_Nullable FOSSDLFindTextField(UIView *view) {
+    NSMutableArray<UIView *> *pending = [NSMutableArray arrayWithObject:view];
+    while (pending.count > 0) {
+        UIView *next = pending.firstObject;
+        [pending removeObjectAtIndex:0];
+        if ([next isKindOfClass:[UITextField class]]) {
+            return (UITextField *)next;
         }
-    });
+        [pending addObjectsFromArray:next.subviews];
+    }
+    return nil;
+}
+
+/// SDL's hidden text field in the game's window: the first responder, holding the keyboard, while text input is on.
+static UITextField *_Nullable FOSSDLTextField(void) {
+    UIWindow *window = FOSSDLGameWindow();
+    return window != nil ? FOSSDLFindTextField(window) : nil;
+}
+
+/// The text field whose keyboard the player hid, until it loses the focus; and the observer that watches for that.
+static __weak UITextField *_Nullable fosKeyboardHiddenField = nil;
+static id _Nullable fosEndEditingObserver = nil;
+
+// The game turns SDL's text input on and off every frame to match its focused widget, so FactoriOS leaves text input
+// alone and only swaps the text field's input view: an empty one hides the keyboard while the field keeps the focus.
+
+void FOSSDLSetScreenKeyboardShown(BOOL shown) {
+    UITextField *field = FOSSDLTextField();
+    if (field == nil || !field.isFirstResponder) {
+        // No text field of the game has the focus: nothing to type into.
+        return;
+    }
+    field.inputView = shown ? nil : [[UIView alloc] initWithFrame:CGRectZero];
+    [field reloadInputViews];
+    if (shown) {
+        fosKeyboardHiddenField = nil;
+        return;
+    }
+    fosKeyboardHiddenField = field;
+    if (fosEndEditingObserver == nil) {
+        // The next text field the game focuses brings the keyboard back.
+        fosEndEditingObserver = [[NSNotificationCenter defaultCenter]
+            addObserverForName:UITextFieldTextDidEndEditingNotification
+                        object:nil
+                         queue:nil
+                    usingBlock:^(NSNotification *notification) {
+                        UITextField *ended = notification.object;
+                        if (ended != nil && ended == fosKeyboardHiddenField) {
+                            ended.inputView = nil;
+                            fosKeyboardHiddenField = nil;
+                        }
+                    }];
+    }
+}
+
+BOOL FOSSDLScreenKeyboardShown(void) {
+    UITextField *field = FOSSDLTextField();
+    return (BOOL)(field != nil && field.isFirstResponder && field.inputView == nil);
 }
 
 UIWindow *_Nullable FOSSDLGameWindow(void) {
@@ -333,13 +426,4 @@ UIWindow *_Nullable FOSSDLGameWindow(void) {
         }
     });
     return found;
-}
-
-BOOL FOSSDLHasWindow(void) {
-    __block BOOL hasWindow = NO;
-    FOSSDLWithFirstWindow(^(FOSSDLWindow *window) {
-        (void)window;
-        hasWindow = YES;
-    });
-    return hasWindow;
 }

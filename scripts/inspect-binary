@@ -41,7 +41,6 @@ REPLACED_SYMBOLS = {
     "_OBJC_CLASS_$_NSColorSpace",
     "_OBJC_CLASS_$_NSWorkspace",
     "_UAZoomEnabled",
-    "_IOPMAssertionCreateWithDescription",
     "_IOPMAssertionRelease",
     "_clGetPlatformIDs",
     "_clGetDeviceIDs",

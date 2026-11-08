@@ -29,7 +29,7 @@ extension HFSPlusVolume {
         try collect(item, relativePath: "", skipping: skipping, into: &plan)
         let total = plan.reduce(0) { $0 + ($1.item.kind == .file ? $1.item.size : 0) }
         var done: UInt64 = 0
-        progress(ExtractionProgress(bytesDone: 0, bytesTotal: total, path: ""))
+        progress(ExtractionProgress(bytesDone: 0, bytesTotal: total))
         for planned in plan {
             let url = Self.url(of: planned, in: destination)
             try writing(url) {
@@ -41,7 +41,7 @@ extension HFSPlusVolume {
                 case .file:
                     try writeFile(planned.item, to: url) { written in
                         done += written
-                        progress(ExtractionProgress(bytesDone: done, bytesTotal: total, path: planned.relativePath))
+                        progress(ExtractionProgress(bytesDone: done, bytesTotal: total))
                     }
                 }
             }

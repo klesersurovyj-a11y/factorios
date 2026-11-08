@@ -12,7 +12,7 @@ public enum PadButton: Int, CaseIterable, Codable, Sendable {
     case north = 3
     /// The map.
     case back = 4
-    /// The guide button: Factorio's pause menu.
+    /// The guide button; it fills the SDL gamepad's button slots, but no control sends it.
     case guide = 5
     /// The game menu.
     case start = 6
@@ -61,8 +61,10 @@ public protocol GameInput: AnyObject {
     func setAxis(_ axis: PadAxis, value: Float)
     /// Moves the game's mouse cursor to a point in the game window, in points.
     func moveCursor(toX x: Float, y: Float)
-    /// Scrolls the mouse wheel by whole notches; positive is up (zoom in).
+    /// Scrolls the mouse wheel by whole notches; positive is up.
     func scroll(notches: Float)
-    /// Shows the system keyboard for text entry, or hides it.
+    /// Shows or hides the system keyboard for the game's focused text field; does nothing when none is focused.
     func setKeyboardVisible(_ visible: Bool)
+    /// Whether the system keyboard is up for the game's focused text field.
+    var isKeyboardVisible: Bool { get }
 }

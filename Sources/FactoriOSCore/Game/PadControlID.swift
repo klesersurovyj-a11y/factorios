@@ -126,9 +126,9 @@ extension PadControlID {
         case .rightTrigger:
             PadControlSpec(kind: .trigger(.rightTrigger), x: 0.925, y: 0.42, size: 0.10)
         case .view:
-            PadControlSpec(kind: .button(.back), x: 0.4715, y: 0.18, size: 0.085)
+            PadControlSpec(kind: .button(.back), x: 0.4715, y: 0.26, size: 0.085)
         case .menu:
-            PadControlSpec(kind: .button(.start), x: 0.5285, y: 0.18, size: 0.085)
+            PadControlSpec(kind: .button(.start), x: 0.5285, y: 0.26, size: 0.085)
         case .rightStick:
             PadControlSpec(kind: .stick(PadStick(x: .rightX, y: .rightY)), x: 0.64, y: 0.74, size: 0.24)
         case .leftStickClick:
@@ -181,9 +181,9 @@ extension PadControlID {
         }
     }
 
-    /// The top middle for Map and Menu, otherwise the bottom corner on the control's side.
+    /// The top middle for Map and Menu, which sit under the toolbar, otherwise the bottom corner on the control's side.
     public var anchor: PadAnchor {
-        if spec.y < 0.2 {
+        if spec.y < 0.3 {
             return PadAnchor(across: 0.5, down: 0)
         }
         return PadAnchor(across: spec.x < 0.5 ? 0 : 1, down: 1)

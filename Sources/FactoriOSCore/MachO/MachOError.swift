@@ -23,7 +23,7 @@ public enum MachOError: Error, LocalizedError, Equatable {
     /// The rebuilt load commands plus room for a code signature command don't fit in the header padding.
     case noRoomForLoadCommands(needed: Int, available: Int)
 
-    /// A sentence the launcher shows to the player.
+    /// A sentence the prepare tool prints.
     public var errorDescription: String? {
         switch self {
         case .notMachO:

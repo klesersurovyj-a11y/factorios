@@ -19,7 +19,7 @@ final class PadView: UIView {
         }
     }
 
-    /// The controls step aside: a physical controller is in use, or Factorio is in keyboard-and-mouse mode.
+    /// The controls step aside: a physical controller is in use.
     var stepsAside = false {
         didSet {
             if stepsAside {
@@ -33,9 +33,6 @@ final class PadView: UIView {
     var onFeedback: (PadFeedback) -> Void = { _ in
         // Set by the overlay; without it the pad plays no haptics.
     }
-
-    /// The control the editor's tools act on.
-    var selected: PadControlID? { editor.selected }
 
     /// Whether the controls are drawn and take touches.
     private var controlsShown: Bool {

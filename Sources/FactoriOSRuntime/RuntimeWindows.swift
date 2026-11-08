@@ -5,39 +5,44 @@ import UIKit
 /// FactoriOS's own windows: the launcher's, the overlay above the game and the restart notice.
 @MainActor
 enum RuntimeWindows {
-    /// The app's window scene, when UIKit has connected one (it does for apps with and without a scene manifest).
-    static var windowScene: UIWindowScene? {
-        UIApplication.shared.connectedScenes.lazy.compactMap { $0 as? UIWindowScene }.first
-    }
-
-    /// The bounds of the screen the app is on.
-    static var screenBounds: CGRect {
-        windowScene?.screen.bounds ?? UIScreen.main.bounds
-    }
-
-    /// A new window on the app's scene, or covering the screen when there is no scene.
-    static func makeWindow() -> UIWindow {
-        if let windowScene {
-            return UIWindow(windowScene: windowScene)
+    /// The app's window scene.
+    ///
+    /// Info.plist declares SDL's scene delegate, and SDL calls FactoriOS's main only once the scene has connected, so
+    /// it exists for everything FactoriOS shows.
+    static var windowScene: UIWindowScene {
+        guard let scene = UIApplication.shared.connectedScenes.lazy.compactMap({ $0 as? UIWindowScene }).first else {
+            // Only reachable if Info.plist lost its scene manifest or SDL called main before the scene connected.
+            fatalError("FactoriOS runs before UIKit has connected its window scene")
         }
-        return UIWindow(frame: screenBounds)
+        return scene
+    }
+
+    /// A new window on the app's scene.
+    static func makeWindow() -> UIWindow {
+        UIWindow(windowScene: windowScene)
     }
 
     /// A new full-screen overlay window one level above normal windows, where SDL's window is.
     static func makeOverlayWindow(root: UIViewController) -> PassthroughWindow {
-        let window = windowScene.map { PassthroughWindow(windowScene: $0) } ?? PassthroughWindow(frame: screenBounds)
-        window.frame = screenBounds
+        let scene = windowScene
+        let window = PassthroughWindow(windowScene: scene)
+        window.frame = scene.screen.bounds
         window.windowLevel = UIWindow.Level(rawValue: UIWindow.Level.normal.rawValue + 1)
         window.backgroundColor = .clear
         window.rootViewController = root
-        // Shown without becoming key: SDL's window keeps the keyboard focus for text input.
+        // Shown without becoming key, and never key (see PassthroughWindow): SDL's window keeps the keyboard focus.
         window.isHidden = false
         return window
     }
 }
 
 /// A window whose empty areas let touches through to the windows below it.
+///
+/// It never becomes key: UIKit makes a touched window key, and SDL's window losing the key status loses SDL's
+/// keyboard focus, which drops text input and keyboard events.
 final class PassthroughWindow: UIWindow {
+    override var canBecomeKey: Bool { false }
+
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let view = super.hitTest(point, with: event)
         return view === self || view === rootViewController?.view ? nil : view

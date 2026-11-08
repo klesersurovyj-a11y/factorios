@@ -216,7 +216,8 @@ NSUInteger FOSBCDecodedBytesPerPixel(MTLPixelFormat format) {
     }
 }
 
-NSUInteger FOSBCBlockBytes(MTLPixelFormat format) {
+/// Bytes per 4×4 block: 8 for BC1 and BC4, 16 for BC2, BC3 and BC5; 0 for formats the decoder doesn't handle.
+static NSUInteger FOSBCBlockBytes(MTLPixelFormat format) {
     switch (FOSKind(format)) {
     case FOSBlockKindBC1:
     case FOSBlockKindBC4:

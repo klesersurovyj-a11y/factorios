@@ -2,7 +2,7 @@ import FactoriOSCore
 import UIKit
 
 /// A button of the overlay's toolbar.
-enum PadTool: CaseIterable {
+enum PadTool {
     /// Opens the layout editor.
     case edit
     /// Steps to the next opacity.
@@ -11,7 +11,8 @@ enum PadTool: CaseIterable {
     case hide
     /// Shows the controls again.
     case show
-    /// Shows or hides the system keyboard, for naming a save or pasting a blueprint string.
+    /// Hides or shows the system keyboard while a game text field has the focus (naming a save, pasting a blueprint
+    /// string); focusing one brings the keyboard up by itself.
     case keyboard
     /// Adds a removed control back: a menu of them.
     case add

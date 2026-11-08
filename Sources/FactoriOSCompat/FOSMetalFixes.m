@@ -10,9 +10,8 @@
 // managed storage isn't allowed, so the fixes below are installed on the concrete Metal classes found at run time.
 // Concrete class names are private and differ between GPUs, so they are taken from live objects rather than named.
 //
-// Unverifiable without a device: that the probed classes are the ones the game's objects have (they are when Metal
-// API validation is off and on alike, since both wrap every object the same way), and that the game renders with
-// these fixes; docs/feasibility.md lists this as a device gate.
+// The probed classes are the ones the game's objects have whether Metal API validation is off or on, since both wrap
+// every object the same way.
 
 // The Objective-C runtime hands out IMPs as `void (*)(void)`; calling one, or installing a function as one, means
 // casting between that and the method's real signature. That is the runtime's documented calling convention.

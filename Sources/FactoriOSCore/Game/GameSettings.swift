@@ -27,19 +27,35 @@ public struct GameSettings: Codable, Equatable, Sendable {
         case wide = 20
     }
 
-    /// The share of the screen's native pixels the game renders, in percent (100 is native).
-    public var resolutionScale: Int
+    /// Factorio's UI size, named for the monitor it matches: the UI takes as much of the screen as it does of a
+    /// monitor this many pixels high at Factorio's 100%.
+    public enum UIScale: Int, Codable, CaseIterable, Sendable {
+        /// As on a 720-pixel monitor, the smallest Factorio supports: the largest UI.
+        case large = 720
+        /// As on a 900-pixel monitor.
+        case medium = 900
+        /// As on a 1080-pixel monitor: the smallest UI, with the most of the game in view.
+        case small = 1_080
+
+        /// Factorio's pixel UI scale (`custom-ui-scale`) for a game `pixelHeight` pixels high, to two decimals.
+        public func pixelScale(forHeight pixelHeight: Int) -> Double {
+            (Double(pixelHeight) / Double(rawValue) * 100).rounded() / 100
+        }
+    }
+
     /// The frame-rate cap.
     public var frameRate: FrameRate
     /// The margin round the game.
     public var frame: Frame
+    /// Factorio's UI size.
+    public var uiScale: UIScale
     /// Factorio's sprite resolution.
     public var spriteQuality: SpriteQuality
     /// Light graphics turn off smoke, clouds, decoratives, particles, shadows and terrain effects.
     public var lightGraphics: Bool
-    /// Factorio's FPS/UPS counter in the top-left corner.
+    /// FactoriOS's overlay FPS label, counted from presented frames (not Factorio's FPS/UPS counter).
     public var fpsCounter: Bool
-    /// Verbose logs: frame presentation, memory and every graphics error.
+    /// Turns on Metal's validation layer (`MTL_DEBUG_LAYER`) and verbose SDL logging.
     public var detailedLogs: Bool
     /// Haptics for the game's rumble and the on-screen buttons.
     public var vibration: Bool
@@ -49,9 +65,9 @@ public struct GameSettings: Codable, Equatable, Sendable {
 
     /// The settings a fresh install starts with.
     public static let defaults = Self(
-        resolutionScale: 100,
         frameRate: .sixty,
         frame: .off,
+        uiScale: .large,
         spriteQuality: .medium,
         lightGraphics: false,
         fpsCounter: false,
@@ -59,7 +75,4 @@ public struct GameSettings: Codable, Equatable, Sendable {
         vibration: true,
         lightApplied: false
     )
-
-    /// Resolution scales offered in Settings, in percent.
-    public static let resolutionScales = [50, 67, 75, 100]
 }

@@ -37,7 +37,7 @@ public enum GameImporter {
     /// `Contents/data/base/info.json` and whether it is the demo from `Info.plist`'s `CFBundleDisplayName`,
     /// replaces `paths.gameApp` with it, writes `paths.gameInfo` and returns it.
     ///
-    /// Runs for minutes (about 1.5 GB is decompressed); call it off the main thread.
+    /// Runs for minutes (about 1.5 GB is decompressed).
     public static func importGame(
         from dmg: URL,
         paths: GamePaths,

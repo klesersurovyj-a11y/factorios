@@ -1,10 +1,11 @@
 # Feasibility: Factorio's macOS build on iOS
 
-Evidence comes from `artifact/factorio-demo_mac_2.1.23.dmg` (Factorio demo 2.1.23), read with 7-Zip and
-`scripts/inspect-binary` (LIEF plus a small ARM64 cross-referencer). Everything quoted below is that script's output or a
-7-Zip listing. Conclusions that rest on knowledge of iOS rather than on the binary are marked **[inference]**.
+Evidence comes from `scripts/inspect-binary` (LIEF plus a small ARM64 cross-referencer) run on
+`artifact/factorio_mac_2.1.24.dmg` (Factorio 2.1.24), and from a 7-Zip listing of
+`artifact/factorio-demo_mac_2.1.23.dmg` (demo 2.1.23) where marked. Everything quoted below is that output.
+Conclusions that rest on knowledge of iOS rather than on the binary are marked **[inference]**.
 
-**Verdict: no blocker found in the binary; four gates remain that only a device can close.** The game's own code
+**Verdict: Factorio 2.1.24 runs on an iPhone 14 (A15, iOS 26.6.1); all four gates below passed there.** The game's own code
 reaches a handful of Mac-only APIs. For most of them iOS has a counterpart; for the rest (OpenCL, process restart,
 `fork`, display sync) the honest iOS behaviour is "not available", which the game already handles. Everything else
 that is Mac-only belongs to the statically linked SDL3, which the game hands over to an iOS build of SDL3 through
@@ -12,7 +13,7 @@ SDL's dynamic API. The gates are listed at the end.
 
 ## The disk image
 
-UDIF (`koly` trailer), partition map with one `Apple_HFS` partition. Chunk types in the `blkx` tables:
+UDIF (`koly` trailer), partition map with one `Apple_HFS` partition. Chunk types in the `blkx` tables (demo 2.1.23):
 
 ```
 Counter({'0x80000006': 2472, '0xffffffff': 9, '0x2': 5})
@@ -55,7 +56,7 @@ What that means for the converter:
 - **28 KB free after the load commands**: room to rebuild the command list (add `LC_ID_DYLIB`, drop `LC_LOAD_DYLINKER`).
 - **A 4 GB `__PAGEZERO`** has to shrink before the image can be `dlopen`ed as a library, as LiveContainer does.
 - **Framework paths** are macOS's versioned ones (`Versions/A/`); iOS frameworks are flat, so every path is rewritten.
-- The full symbol table is present (1,088,708 symbols), so functions have names in the evidence below.
+- The full symbol table is present (1,088,708 symbols in demo 2.1.23), so functions have names in the evidence below.
 
 ## Mac-only APIs the game itself reaches
 
@@ -121,7 +122,7 @@ the compatibility slots. So none of that code may reach a Mac-only or replaced i
 ```
 __objc_nlclslist (+load): 0 entries
 __objc_nlcatlist (+load): 0 entries
-__mod_init_func: 448 initializers; 3594 functions reached to fixed point; 102 imports
+__mod_init_func: 449 initializers; 3595 functions reached to fixed point; 102 imports
   replaced symbols reached before slot patching: none
   pre-load library redirects: _nan → libSystem.B.dylib
   unhandled Mac-only symbols reached: none
@@ -133,8 +134,8 @@ depth, and checks the actual 16-symbol replacement table. CoreServices' `_nan` i
 converter redirects that weak library ordinal to iOS's libSystem before dyld runs initializers. Calls hidden behind
 function pointers remain a device-test risk. The other reached imports are constants and APIs present on iOS
 (`kCGColorSpaceSRGB`, `kCAFilter*`, `MTLCommonCounter*`, Foundation error keys). This evidence supports—without
-proving on-device—that filling the remaining slots after `dlopen` is early enough. Re-run `scripts/inspect-binary`
-for every game version.
+proving on-device—that filling the remaining slots after `dlopen` is early enough; the 2.1.24 device runs bear it out.
+Re-run `scripts/inspect-binary` for every game version.
 
 ## Metal on iOS
 
@@ -211,23 +212,26 @@ uses no JIT: every converted library is signed with the same Apple Development i
 LiveContainer's guests are iOS binaries; FactoriOS's is a macOS binary retagged for iOS (`LC_BUILD_VERSION`), which
 dyld otherwise refuses to load into an iOS process **[inference]**.
 
-LiveContainer is AGPL-3.0. FactoriOS uses it only as a cited behavioral precedent; the converter and signer here are
-independent implementations from Mach-O and code-signing formats, with no LiveContainer or ZSign source copied.
+LiveContainer is AGPL-3.0. FactoriOS uses it only as a cited behavioral precedent; the converter here is an
+independent implementation from the Mach-O format, with no LiveContainer or ZSign source copied. Signing is Apple's
+`codesign` on the Mac.
 FactoriOS itself has no granted license yet; choose and add one before distributing source or binaries.
 
-## Gates only a device can close
+## Device gates
 
-1. **Sign and load.** A 226 MB library converted and signed on the device with the host app's Personal Team Apple
-   Development identity passes library validation and `dlopen`s. LiveContainer's JIT-less mode is the precedent; the
-   macOS-to-iOS retag is new.
-2. **SDL hand-over and lifecycle.** The game's static SDL3 forwards to FactoriOS's SDL3, and the UIKit window, Metal
-   layer, touch and audio work when the game's entry point runs inside SDL's `postFinishLaunch`.
-3. **Metal.** The 110 shaders compile on iOS's Metal compiler, and the game renders with managed storage turned into
-   shared storage and without BC textures where the GPU lacks them.
-4. **Memory and CPU.** The demo fits in the device's per-app memory limit with the default free-team profile. If it
-   does not, the optional increased-memory/extended-addressing profile works with the signing team that grants those
-   capabilities. The arm64 macOS slice also executes correctly on the chosen iOS device; no minimum chip generation
-   is inferred from the Mach-O architecture alone.
+All four passed with Factorio 2.1.24 on an iPhone 14 (A15, iOS 26.6.1).
+
+1. **Sign and load.** Passed: the converted library, signed on the Mac with `codesign` and the host app's
+   Personal Team Apple Development identity, passes library validation and `dlopen`s from the app bundle.
+   LiveContainer's JIT-less mode is the precedent; the macOS-to-iOS retag is new.
+2. **SDL hand-over and lifecycle.** Passed: the game's static SDL3 forwards to FactoriOS's SDL3, and the UIKit window,
+   Metal layer, touch, keyboard and audio work with the game's entry point inside SDL's `postFinishLaunch`. Physical
+   controllers are unverified.
+3. **Metal.** Passed: the 110 shaders compile on iOS's Metal compiler, and the game renders at native resolution and
+   60 FPS with managed storage turned into shared storage and without BC textures.
+4. **Memory and CPU.** Passed with Medium sprites under the default free-team profile: main menu and saves load. High
+   sprites exceed the ~3.2 GB per-app limit. Other device generations are untested; no minimum chip generation is
+   inferred from the Mach-O architecture alone.
 
 iOS forbids GPU work in the background; the compatibility layer holds the game's next frame until the app is back in
 the foreground.

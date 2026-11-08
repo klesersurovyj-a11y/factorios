@@ -95,7 +95,7 @@ depends = ["lint", "format-check", "build-host", "check-architecture", "check-re
 
 [tasks.prepare-sdl3]
 hide = true
-description = "Downloads and verifies SDL's official Apple XCFramework"
+description = "Builds SDL3's Apple XCFramework from its pinned source with the dynamic API on (macOS with Xcode)"
 run = "scripts/prepare-sdl3.sh"
 
 [tasks.build-ios]
@@ -123,11 +123,6 @@ swift build \
 [tasks.check-ios]
 description = "Analyzes Objective-C and compiles every target for devices and the simulator"
 depends = ["tidy", "build-ios", "build-ios-simulator"]
-
-[tasks.dev]
-description = "Prepares SDL, then builds and installs with xtool"
-depends = ["prepare-sdl3"]
-run = "xtool dev"
 
 [tasks.xcode-project]
 description = "Prepares SDL, then generates the Xcode workspace"

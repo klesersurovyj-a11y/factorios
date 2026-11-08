@@ -1,7 +1,7 @@
 // The Mac-only API surface Factorio's own code reaches, rebuilt on UIKit, ImageIO and Metal for iOS.
 //
 // The converter records the pointer slots through which the game reaches each symbol in FOSCompatReplacements; the
-// loader writes the replacement's address into those slots after dlopen. Everything here runs on a device only.
+// loader writes the replacement's address into those slots after dlopen.
 
 #ifndef FACTORIOS_COMPAT_H
 #define FACTORIOS_COMPAT_H
@@ -39,10 +39,12 @@ int FOSCompatWriteSlot(void *slot, const void *value);
 /// are created uncompressed and their uploads decoded on the CPU.
 void FOSCompatInstallMetalFixes(void);
 
-/// Sets what `_NSGetExecutablePath` answers: the imported game's macOS executable rather than FactoriOS.
+/// Sets what `_NSGetExecutablePath` answers: the imported game's macOS executable rather than FactoriOS. Call before
+/// loading the game, which asks for it.
 void FOSCompatSetExecutablePath(const char *path);
 
 /// Sets what the game's `execv` (its self-restart) calls instead, on the main thread, with the requested arguments.
+/// Call before loading the game.
 void FOSCompatSetRestartHandler(void (NS_SWIFT_SENDABLE ^handler)(NSArray<NSString *> *arguments));
 
 /// Tells the frame gate whether the app is in the background; while it is, `nextDrawable` waits.

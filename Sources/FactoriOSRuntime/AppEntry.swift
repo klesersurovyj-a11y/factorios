@@ -8,8 +8,8 @@ public import UIKit
 public enum AppEntry {
     /// What the app supplies: the launcher's and the overlay's view controllers.
     private struct Factories {
-        let launcher: @MainActor (GameInstallation, LaunchCoordinator) -> UIViewController
-        let overlay: @MainActor (any GameInput, GameSettings) -> UIViewController
+        let launcher: @MainActor (GamePaths, GameInstallation, LaunchCoordinator) -> UIViewController
+        let overlay: @MainActor (GamePaths, any GameInput, GameSettings) -> UIViewController
     }
 
     /// How long one turn of the launcher's run-loop pump waits for events.
@@ -29,8 +29,8 @@ public enum AppEntry {
     /// when it ends, the app exits).
     @MainActor
     public static func run(
-        launcher: @escaping @MainActor (GameInstallation, LaunchCoordinator) -> UIViewController,
-        overlay: @escaping @MainActor (any GameInput, GameSettings) -> UIViewController
+        launcher: @escaping @MainActor (GamePaths, GameInstallation, LaunchCoordinator) -> UIViewController,
+        overlay: @escaping @MainActor (GamePaths, any GameInput, GameSettings) -> UIViewController
     ) -> Never {
         factories = Factories(launcher: launcher, overlay: overlay)
         var error: NSError?
@@ -57,7 +57,7 @@ public enum AppEntry {
         let installation = GameInstallation(paths: paths)
         let coordinator = LaunchCoordinator()
         let window = RuntimeWindows.makeWindow()
-        window.rootViewController = factories.launcher(installation, coordinator)
+        window.rootViewController = factories.launcher(paths, installation, coordinator)
         window.makeKeyAndVisible()
         while true {
             let request = waitForLaunch(coordinator)

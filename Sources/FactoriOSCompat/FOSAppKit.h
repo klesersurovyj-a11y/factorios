@@ -1,4 +1,4 @@
-// The Mac-only AppKit and Foundation classes Factorio's own code uses, rebuilt on ImageIO, CoreGraphics and UIKit.
+// The Mac-only AppKit and Foundation classes Factorio's binary references, rebuilt on ImageIO, CoreGraphics and UIKit.
 // The loader points the game's class references for NSAppleEventManager, NSBitmapImageRep, NSColorSpace and
 // NSWorkspace at these classes, so they answer exactly the selectors the game sends (docs/feasibility.md lists them).
 
@@ -64,21 +64,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-/// NSAppleEventManager: iOS has no Apple Events, so the game's URL-handler registration is ignored.
+/// NSAppleEventManager. Only the game's static SDL's Cocoa backend messages it, and that never runs (the game's SDL
+/// forwards to FactoriOS's), but the library can't load without a class behind the reference.
 @interface FOSAppleEventManager : NSObject
-
-/// The shared manager; the same object on every call.
-+ (FOSAppleEventManager *)sharedAppleEventManager;
-
-/// Ignores a URL handler: the game's SDL code registers one for `kInternetEventClass`/`kAEGetURL`.
-- (void)setEventHandler:(nullable id)handler
-            andSelector:(SEL)selector
-          forEventClass:(uint32_t)eventClass
-             andEventID:(uint32_t)eventID;
-
-/// Ignores a handler removal; there was nothing to remove.
-- (void)removeEventHandlerForEventClass:(uint32_t)eventClass andEventID:(uint32_t)eventID;
-
 @end
 
 /// NSWorkspace: shows folders in the Files app.

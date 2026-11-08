@@ -4,11 +4,12 @@
 @import UIKit;
 
 // SDL's UIKit window (SDL_uikitwindow) resets its frame to the screen's bounds in layoutSubviews, an old orientation
-// workaround. To keep the Frame margin, a window given a fixed frame here lays out as a plain UIWindow instead, with
-// its frame put back if something else moved it; windows without one keep SDL's behaviour.
+// workaround. To keep the game off the camera housing and inside the Frame margin, a window given a fixed frame here
+// lays out as a plain UIWindow instead, with its frame put back if something else moved it; windows without one keep
+// SDL's behaviour.
 //
-// Unverifiable without a device: that SDL's view controller then reports the inset size to the game (it sizes its
-// view from the window's bounds in viewDidLayoutSubviews).
+// SDL's view controller then reports the inset size to the game (it sizes its view from the window's bounds in
+// viewDidLayoutSubviews): on an iPhone 14 with the housing inset, Factorio logs a 797x390 window on the 844x390 screen.
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wcast-function-type-strict"

@@ -2,6 +2,23 @@ import Foundation
 
 /// Writes FactoriOS's settings into Factorio's `config.ini`; the player's other settings stay as they are.
 public enum FactorioConfig {
+    /// What the config depends on about the device the game starts on.
+    public struct Device: Sendable {
+        /// Whether a keyboard and mouse are connected, which puts Factorio in keyboard-and-mouse mode.
+        public var keyboardAndMouse: Bool
+        /// Whether the GPU samples BC-compressed textures.
+        public var supportsBCTextures: Bool
+        /// The screen's height sideways (its short side) in pixels, which the UI scale is measured in.
+        public var screenHeight: Int
+
+        /// Describes a device.
+        public init(keyboardAndMouse: Bool, supportsBCTextures: Bool, screenHeight: Int) {
+            self.keyboardAndMouse = keyboardAndMouse
+            self.supportsBCTextures = supportsBCTextures
+            self.screenHeight = screenHeight
+        }
+    }
+
     /// Without its version header Factorio calls the file invalid and offers to reset it.
     private static let versionHeader = "; version=13"
     /// The effects light graphics turn off; Factorio has them all on by default.
@@ -11,8 +28,8 @@ public enum FactorioConfig {
         "elevated-rail-shadows",
     ]
 
-    /// Returns `ini` with FactoriOS's keys set: paths, input method, UI scale, sprite quality, effects and, on GPUs
-    /// without BC formats, texture compression.
+    /// Returns `ini` with FactoriOS's keys set: paths, input method, native resolution, UI scale, sprite quality,
+    /// effects and, on GPUs without BC formats, texture compression.
     ///
     /// The FPS counter is an app overlay fed by the runtime's Metal presentation hook, not a `config.ini` key.
     ///
@@ -20,24 +37,23 @@ public enum FactorioConfig {
     ///   - ini: The current `config.ini` text, empty when there is none yet.
     ///   - paths: Where the game's data and the player's folder are.
     ///   - settings: The player's settings.
-    ///   - keyboardAndMouse: Whether a keyboard was connected, which puts Factorio in keyboard-and-mouse mode.
-    ///   - supportsBCTextures: Whether the GPU samples BC-compressed textures.
+    ///   - device: The device the game starts on.
     /// - Returns: The updated text.
-    public static func update(
-        _ ini: String, paths: GamePaths, settings: GameSettings, keyboardAndMouse: Bool, supportsBCTextures: Bool
-    ) -> String {
+    public static func update(_ ini: String, paths: GamePaths, settings: GameSettings, device: Device) -> String {
         var config = ini.hasPrefix("; version=") ? ini : versionHeader + "\n" + ini
         // Factorio derives its paths from its executable, which here is FactoriOS, so name them.
         config = set(config, section: "path", key: "read-data", value: paths.gameData.path)
         config = set(config, section: "path", key: "write-data", value: paths.writeData.path)
         // Factorio doesn't switch between mouse and controller by itself.
-        let method = keyboardAndMouse ? "keyboard-and-mouse" : "game-controller"
+        let method = device.keyboardAndMouse ? "keyboard-and-mouse" : "game-controller"
         config = set(config, section: "input", key: "input-method", value: method)
-        // Factorio's automatic UI scale is too small on a phone; once the player picks one, theirs stays.
-        if !lines(of: config).contains(where: { $0.hasPrefix("ui-scale-mode=") }) {
-            config = set(config, section: "interface", key: "ui-scale-mode", value: "manual-display-points")
-            config = set(config, section: "interface", key: "custom-proportional-ui-scale", value: "1.25")
-        }
+        // Without native resolution Factorio draws at the window's size in points, a third of an iPhone's pixels, and
+        // upscales: text at a UI scale small enough to show the game is a blur.
+        config = set(config, section: "graphics", key: "render-in-native-resolution", value: "true")
+        // The UI scale is FactoriOS's setting: Factorio's own choice in its menu lasts until the next start.
+        config = set(config, section: "interface", key: "ui-scale-mode", value: "manual-pixels")
+        let scale = settings.uiScale.pixelScale(forHeight: device.screenHeight)
+        config = set(config, section: "interface", key: "custom-ui-scale", value: String(scale))
         config = set(config, section: "graphics", key: "graphics-quality", value: settings.spriteQuality.rawValue)
         if let shown = effectsValue(light: settings.lightGraphics, lightApplied: settings.lightApplied) {
             for key in effects {
@@ -46,7 +62,7 @@ public enum FactorioConfig {
         }
         // Factorio compresses sprites to BC, which iPhone GPUs lack: FactoriOS's Metal fixes decode BC on the CPU, so
         // compression would save no memory, and GPU-accelerated compression writes BC data the CPU never sees.
-        if !supportsBCTextures {
+        if !device.supportsBCTextures {
             config = set(config, section: "graphics", key: "texture-compression-level", value: "none")
             config = set(config, section: "graphics", key: "gpu-accelerated-compression", value: "false")
         }
@@ -58,13 +74,10 @@ public enum FactorioConfig {
     /// - Parameters:
     ///   - paths: Where `config.ini` and the game's data are.
     ///   - settings: The player's settings.
-    ///   - keyboardAndMouse: Whether a keyboard was connected, which puts Factorio in keyboard-and-mouse mode.
-    ///   - supportsBCTextures: Whether the GPU samples BC-compressed textures.
+    ///   - device: The device the game starts on.
     /// - Returns: `settings` with `lightApplied` recording what was written; the caller saves it.
     /// - Throws: The file system's error when `config.ini` can't be read or written.
-    public static func write(
-        paths: GamePaths, settings: GameSettings, keyboardAndMouse: Bool, supportsBCTextures: Bool
-    ) throws -> GameSettings {
+    public static func write(paths: GamePaths, settings: GameSettings, device: Device) throws -> GameSettings {
         let file = paths.config
         let old: String
         if FileManager.default.fileExists(atPath: file.path) {
@@ -72,13 +85,7 @@ public enum FactorioConfig {
         } else {
             old = ""
         }
-        let config = update(
-            old,
-            paths: paths,
-            settings: settings,
-            keyboardAndMouse: keyboardAndMouse,
-            supportsBCTextures: supportsBCTextures
-        )
+        let config = update(old, paths: paths, settings: settings, device: device)
         try FileManager.default.createDirectory(
             at: file.deletingLastPathComponent(),
             withIntermediateDirectories: true

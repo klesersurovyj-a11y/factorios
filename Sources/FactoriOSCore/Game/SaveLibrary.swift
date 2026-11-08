@@ -62,11 +62,6 @@ public struct SaveLibrary: Sendable {
         return saves.sorted { $0.modified > $1.modified }
     }
 
-    /// The save the game wrote last, which Continue loads.
-    public func newest() throws -> SaveFile? {
-        try saves().first
-    }
-
     /// Copies the save at `source` into the saves folder.
     ///
     /// The same file imported again changes nothing; a different save with the same name gets a numbered name,

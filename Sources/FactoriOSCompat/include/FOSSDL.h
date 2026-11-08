@@ -23,9 +23,6 @@ BOOL FOSSDLLoad(NSString *path, NSError *_Nullable *_Nullable error);
 /// Hands the process to SDL_RunApp: SDL runs UIApplicationMain and calls `mainFunction` from its app delegate.
 int FOSSDLRunApp(int argc, char *_Nullable *_Nonnull argv, FOSSDLMainFunction mainFunction);
 
-/// Calls SDL_SetMainReady, which lets SDL_Init succeed outside SDL's own main wrapper.
-void FOSSDLSetMainReady(void);
-
 /// Sets an SDL hint (SDL_SetHint); returns whether SDL accepted it.
 BOOL FOSSDLSetHint(NSString *name, NSString *value);
 
@@ -37,9 +34,6 @@ NSString *FOSSDLLastError(void);
 /// high-frequency strengths from 0 to 1; both 0 means stop. It runs on whichever thread the game rumbles from.
 BOOL FOSSDLAttachVirtualGamepad(NSString *name, void (NS_SWIFT_SENDABLE ^_Nullable rumble)(float low, float high),
                                 NSError *_Nullable *_Nullable error);
-
-/// Closes and detaches the virtual gamepad, if one is attached.
-void FOSSDLDetachVirtualGamepad(void);
 
 /// Presses or releases a button of the virtual gamepad (SDL_GamepadButton number).
 void FOSSDLSetGamepadButton(NSInteger button, BOOL pressed);
@@ -53,15 +47,16 @@ void FOSSDLWarpMouse(float x, float y);
 /// Sends a vertical mouse-wheel event to the game's first window; positive notches scroll up.
 void FOSSDLScrollWheel(float notches);
 
-/// Starts or stops text input on the game's first window, which shows or hides the system keyboard.
-void FOSSDLSetTextInputActive(BOOL active);
+/// Shows or hides the system keyboard while a text field of the game has the focus; does nothing when none has.
+/// Text input stays on either way, as the game keeps it; a hidden keyboard comes back with the next focused field.
+void FOSSDLSetScreenKeyboardShown(BOOL shown);
+
+/// Whether the system keyboard is up for a text field of the game.
+BOOL FOSSDLScreenKeyboardShown(void);
 
 /// The UIWindow behind the game's first SDL window, read from its SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER property
-/// ("SDL.window.uikit.window"); nil before the game has created a window or when SDL doesn't set the property.
+/// ("SDL.window.uikit.window"), which SDL sets when it creates the window; nil before the game has created one.
 UIWindow *_Nullable FOSSDLGameWindow(void);
-
-/// Whether the game has created at least one SDL window.
-BOOL FOSSDLHasWindow(void);
 
 NS_ASSUME_NONNULL_END
 

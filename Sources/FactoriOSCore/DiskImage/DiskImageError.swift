@@ -20,8 +20,6 @@ public enum DiskImageError: Error, LocalizedError, Equatable {
     case notHFSPlus
     /// The volume's B-trees or records are inconsistent.
     case malformedVolume(String)
-    /// No item exists at this path in the volume.
-    case notFound(String)
     /// The item at this path is not a directory.
     case notADirectory(String)
     /// The file is stored with HFS+ (decmpfs) compression, which FactoriOS does not decode.
@@ -35,7 +33,7 @@ public enum DiskImageError: Error, LocalizedError, Equatable {
     /// The game's version could not be read from `Contents/data/base/info.json`.
     case unreadableVersion
 
-    /// A message for the player.
+    /// A sentence the prepare tool prints.
     public var errorDescription: String? {
         switch self {
         case .unreadable(let detail):
@@ -63,8 +61,6 @@ public enum DiskImageError: Error, LocalizedError, Equatable {
 
     private var itemDescription: String {
         switch self {
-        case .notFound(let path):
-            "\(path) isn't in the disk image."
         case .notADirectory(let path):
             "\(path) isn't a folder."
         case .compressedFile(let path):
@@ -89,18 +85,10 @@ public struct ExtractionProgress: Sendable, Equatable {
     public let bytesDone: UInt64
     /// Bytes of file contents the extraction writes in total.
     public let bytesTotal: UInt64
-    /// The item being written, relative to the extracted item.
-    public let path: String
 
     /// Creates a progress report.
-    public init(bytesDone: UInt64, bytesTotal: UInt64, path: String) {
+    public init(bytesDone: UInt64, bytesTotal: UInt64) {
         self.bytesDone = bytesDone
         self.bytesTotal = bytesTotal
-        self.path = path
-    }
-
-    /// The completed fraction, from 0 to 1.
-    public var fraction: Double {
-        bytesTotal == 0 ? 1 : Double(bytesDone) / Double(bytesTotal)
     }
 }

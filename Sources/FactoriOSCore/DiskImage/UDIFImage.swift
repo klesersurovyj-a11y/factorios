@@ -53,8 +53,6 @@ public struct UDIFPartition: Sendable {
     public let name: String
     /// The partition's size in 512-byte sectors.
     public let sectorCount: UInt64
-    /// The partition's first sector in the whole disk.
-    public let firstSector: UInt64
     /// The chunks that carry data, ordered by sector.
     let chunks: [UDIFChunk]
 
@@ -63,7 +61,6 @@ public struct UDIFPartition: Sendable {
             throw DiskImageError.malformedImage("block table of \(name) has no mish signature")
         }
         self.name = name
-        firstSector = try table.diskUInt64(at: 8)
         sectorCount = try table.diskUInt64(at: 16)
         let dataStart = dataForkOffset &+ (try table.diskUInt64(at: 24))
         let chunkCount = Int(try table.diskUInt32(at: 200))

@@ -64,9 +64,9 @@ struct LogsView: View {
         let app = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let onOff = { (on: Bool) in on ? "on" : "off" }
         let chosen = [
-            "resolution \(settings.resolutionScale)%",
             "\(settings.frameRate.rawValue) FPS",
             "frame \(settings.frame)",
+            "UI \(settings.uiScale)",
             "sprites \(settings.spriteQuality.rawValue)",
             "graphics \(settings.lightGraphics ? "light" : "full")",
             "FPS counter \(onOff(settings.fpsCounter))",

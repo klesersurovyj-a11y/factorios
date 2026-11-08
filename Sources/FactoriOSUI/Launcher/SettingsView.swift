@@ -33,11 +33,6 @@ struct SettingsView: View {
 
     private var displaySection: some View {
         Section {
-            Picker("Resolution", selection: $model.settings.resolutionScale) {
-                ForEach(GameSettings.resolutionScales, id: \.self) { scale in
-                    Text(scale == 100 ? "Native" : "\(scale)%").tag(scale)
-                }
-            }
             Picker("Frame rate", selection: $model.settings.frameRate) {
                 Text("30 FPS").tag(GameSettings.FrameRate.thirty)
                 Text("60 FPS").tag(GameSettings.FrameRate.sixty)
@@ -46,6 +41,11 @@ struct SettingsView: View {
                 Text("Off").tag(GameSettings.Frame.off)
                 Text("Thin").tag(GameSettings.Frame.thin)
                 Text("Wide").tag(GameSettings.Frame.wide)
+            }
+            Picker("UI size", selection: $model.settings.uiScale) {
+                Text("Large").tag(GameSettings.UIScale.large)
+                Text("Medium").tag(GameSettings.UIScale.medium)
+                Text("Small").tag(GameSettings.UIScale.small)
             }
             Picker("Sprite quality", selection: $model.settings.spriteQuality) {
                 Text("High").tag(GameSettings.SpriteQuality.high)
@@ -57,11 +57,13 @@ struct SettingsView: View {
         } footer: {
             Text(
                 """
-                These apply the next time Factorio starts. Resolution below Native draws fewer pixels: cooler and \
-                longer on battery. The frame keeps rounded screen corners off the game's menus. High sprites need \
-                more memory than an iPhone gives an app, and iOS closes Factorio while it loads them; Medium sprites \
-                take a quarter of that. Light graphics turn off smoke, clouds, decoratives, \
-                particles, shadows and terrain effects; turning them off again puts the effects back.
+                These apply the next time Factorio starts. The frame keeps rounded screen corners off the game's \
+                menus. UI size is Factorio's UI scale, as on a 720-, 900- or 1080-pixel monitor: Large is the \
+                smallest screen Factorio supports, Small fits the most game; Factorio's own UI scale setting lasts \
+                until the next start. High sprites need more memory than an iPhone gives an app, and iOS closes \
+                Factorio while it loads them; Medium sprites take a quarter of that. Light graphics turn off smoke, \
+                clouds, decoratives, particles, shadows and terrain effects; turning them off again puts the effects \
+                back.
                 """
             )
         }
@@ -77,9 +79,9 @@ struct SettingsView: View {
         } footer: {
             Text(
                 """
-                The FPS counter and detailed logs apply the next time Factorio starts. Detailed logs record how \
-                frames reach the screen, the game's memory and every graphics error: turn them on to report a \
-                problem, play until it shows, then copy the Logs.
+                The FPS counter and detailed logs apply the next time Factorio starts. Detailed logs turn on \
+                Metal's validation, which reports every graphics error, and SDL's verbose logging: turn them on to \
+                report a problem, play until it shows, then copy the Logs.
                 """
             )
         }

@@ -54,20 +54,6 @@ public final class HFSPlusVolume: Sendable {
         directoryLinkDirectory = try Self.folderID(named: HFSName.directoryLinkDirectory, in: rootRecords)
     }
 
-    /// The item at a `/`-separated path from the volume root; an empty path is the root.
-    public func lookup(_ path: String) throws -> HFSItem {
-        var item = root
-        for component in path.split(separator: "/") where component != "." {
-            let name = String(component).precomposedStringWithCanonicalMapping
-            guard item.kind == .directory else { throw DiskImageError.notADirectory(item.path) }
-            guard let child = try children(of: item).first(where: { $0.name == name }) else {
-                throw DiskImageError.notFound(path)
-            }
-            item = child
-        }
-        return item
-    }
-
     /// The items in a folder, in catalog order, with hard links resolved; the volume's private metadata folders
     /// are left out.
     public func children(of directory: HFSItem) throws -> [HFSItem] {

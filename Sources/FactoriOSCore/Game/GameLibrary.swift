@@ -1,6 +1,6 @@
 public import Foundation
 
-/// The converted game library FactoriOS loads, built the same way on the device and on a development Mac.
+/// The converted game library FactoriOS loads, which the Mac prepare tool builds.
 public enum GameLibrary {
     /// The converted library's install name (LC_ID_DYLIB).
     public static let installName = "@rpath/factorio.dylib"
@@ -17,7 +17,6 @@ public enum GameLibrary {
         "_OBJC_CLASS_$_NSColorSpace",
         "_OBJC_CLASS_$_NSWorkspace",
         "_UAZoomEnabled",
-        "_IOPMAssertionCreateWithDescription",
         "_IOPMAssertionRelease",
         "_clGetPlatformIDs",
         "_clGetDeviceIDs",
@@ -32,7 +31,7 @@ public enum GameLibrary {
 
     /// Converts the imported executable into an unsigned iOS library, recording the redirected symbols' slots.
     ///
-    /// Slow (the executable is over 200 MB); call it off the main thread.
+    /// Slow: the executable is over 200 MB.
     public static func convert(paths: GamePaths) throws -> ConvertedImage {
         let executable = try Data(contentsOf: paths.gameExecutable, options: .alwaysMapped)
         let options = ConversionOptions(installName: installName, redirectedSymbols: redirectedSymbols)
@@ -41,8 +40,8 @@ public enum GameLibrary {
 
     /// Writes `library` and its slot manifest, replacing earlier ones.
     ///
-    /// The manifest goes first: a library without its manifest can't start, and the installation only counts as ready
-    /// when both exist.
+    /// The manifest goes first: a library without its manifest can't start, and `isBundled` only counts the
+    /// bundled copies as ready when both exist.
     public static func write(library: Data, manifest: SymbolSlotManifest, paths: GamePaths) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]

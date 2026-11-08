@@ -19,20 +19,25 @@ public struct PadPoint: Equatable, Sendable {
 
 /// Where a `PadLayout`'s controls sit on a screen of a given size.
 ///
-/// The layout is drawn in a phone-shaped frame, at most a phone's height, so a tablet's controls are a phone's size;
-/// each control is measured from its anchor's corner of the screen, and kept on screen.
+/// The layout is drawn in a phone-shaped frame, a share of a phone's height, so a tablet's controls are a phone's size
+/// and most of the game stays in view; each control is measured from its anchor's corner of the screen, and kept on
+/// screen.
 public struct PadGeometry: Equatable, Sendable {
     /// The phone the layout was made on, sideways: 2.2 times as wide as high.
     private static let frameAspect = 2.2
     /// About a phone's height sideways, in points.
     private static let maxFrame = 480.0
+    /// The layout frame's share of the screen's: the controls shrink toward their corners by this much.
+    private static let controlsScale = 0.7
+    /// The least a touch area reaches from a control's middle, in points: half of Apple's 44-point smallest target.
+    private static let minimumReach = 22.0
     /// A pill's touch area across, in radii out from its middle.
     private static let pillReachX = 2.2
     /// A pill's touch area down, in radii out from its middle.
     private static let pillReachY = 1.25
-    /// The toolbar's buttons' side, as a fraction of the frame's height.
+    /// The toolbar's buttons' side, as a fraction of the screen frame's height.
     private static let toolFraction = 0.085
-    /// The toolbar's distance from the top, as a fraction of the frame's height.
+    /// The toolbar's distance from the top, as a fraction of the screen frame's height.
     private static let toolbarTopFraction = 0.025
 
     /// The overlay's width.
@@ -41,6 +46,8 @@ public struct PadGeometry: Equatable, Sendable {
     public let height: Double
     /// The height of the frame the layout is drawn in; sizes are fractions of it.
     public let frame: Double
+    /// The phone-shaped frame that fits the screen; the toolbar is measured in it.
+    private let screenFrame: Double
 
     private var frameWidth: Double { frame * Self.frameAspect }
 
@@ -48,13 +55,14 @@ public struct PadGeometry: Equatable, Sendable {
     public init(width: Double, height: Double) {
         self.width = width
         self.height = height
-        frame = max(0, min(height, width / Self.frameAspect, Self.maxFrame))
+        screenFrame = max(0, min(height, width / Self.frameAspect, Self.maxFrame))
+        frame = screenFrame * Self.controlsScale
     }
 
     /// The side of a toolbar button.
-    public var toolSize: Double { frame * Self.toolFraction }
+    public var toolSize: Double { screenFrame * Self.toolFraction }
     /// The toolbar's distance from the top.
-    public var toolbarTop: Double { frame * Self.toolbarTopFraction }
+    public var toolbarTop: Double { screenFrame * Self.toolbarTopFraction }
 
     /// The radius of `control` (half a pill's height).
     public func radius(of control: PadControlID, in layout: PadLayout) -> Double {
@@ -90,10 +98,10 @@ public struct PadGeometry: Equatable, Sendable {
             let hit: Bool
             if control.isPill {
                 hit =
-                    abs(point.x - middle.x) <= Self.pillReachX * radius
-                    && abs(point.y - middle.y) <= Self.pillReachY * radius
+                    abs(point.x - middle.x) <= max(Self.pillReachX * radius, Self.minimumReach)
+                    && abs(point.y - middle.y) <= max(Self.pillReachY * radius, Self.minimumReach)
             } else {
-                hit = point.distance(to: middle) <= radius * control.kind.reach
+                hit = point.distance(to: middle) <= max(radius * control.kind.reach, Self.minimumReach)
             }
             if hit {
                 return control

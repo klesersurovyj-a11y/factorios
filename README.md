@@ -5,8 +5,8 @@ factorio.com, turns it into a library iOS can load, signs it with the same Apple
 FactoriOS, embeds it in the app bundle, and runs it natively. SDL3 for iOS and a small compatibility layer replace the
 few Mac-only APIs the game uses. No emulation, no streaming, and none of the game's files in the app.
 
-**Status: written and compiled for iOS in CI, not yet run on a device.** Compilation proves no runtime behaviour.
-`docs/building.md` defines the device-validation procedure; `docs/architecture.md` lists every deferred result.
+**Status: Factorio 2.1.24 runs on an iPhone 14 (A15, iOS 26.6.1)** at native resolution and 60 FPS with Medium
+sprites. Physical controllers and the restart prompt are unverified; `docs/architecture.md` has the device status.
 
 ## How it works
 
@@ -15,7 +15,7 @@ flowchart LR
     dmg[factorio .dmg] --> importer[Importer<br/>UDIF, bzip2, HFS+]
     importer --> app[factorio.app]
     app --> converter[Converter<br/>Mach-O to iOS dylib]
-    converter --> signer[Signer<br/>CodeDirectory + CMS]
+    converter --> signer[codesign on the Mac<br/>embed in the app]
     signer --> loader[Loader<br/>dlopen, compat slots]
     loader --> game[Factorio's main]
     game -- SDL3_DYNAMIC_API --> sdl[SDL3 for iOS]
@@ -23,7 +23,7 @@ flowchart LR
 ```
 
 - [Feasibility](docs/feasibility.md): what the macOS binary needs, from its own load commands and code.
-- [Architecture](docs/architecture.md): modules, public APIs, the compatibility map, and what's deferred to a device.
+- [Architecture](docs/architecture.md): modules, public APIs, the compatibility map, and device status.
 - [Building](docs/building.md): tools, checks, and building the app with xtool.
 
 ## Requirements

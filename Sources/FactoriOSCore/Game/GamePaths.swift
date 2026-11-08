@@ -74,7 +74,7 @@ public struct GamePaths: Sendable, Equatable {
 
     /// FactoriOS's logs: the game's stdout/stderr and FactoriOS's own messages.
     public var logs: URL { support.appendingPathComponent("Logs", isDirectory: true) }
-    /// FactoriOS's settings and controller layout.
+    /// FactoriOS's settings; the controller layout is in `padLayoutFile`.
     public var settingsFile: URL { support.appendingPathComponent("settings.json") }
     /// The on-screen controller layout.
     public var padLayoutFile: URL { support.appendingPathComponent("pad-layout.json") }

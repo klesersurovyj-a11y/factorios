@@ -11,7 +11,7 @@ final class OverlayViewController: UIViewController {
     private let input: (any GameInput)?
     private let vibration: Bool
     private let showFPS: Bool
-    private let layoutFile: URL?
+    private let layoutFile: URL
     private let onFinishEditing: (() -> Void)?
     private let padView: PadView
     private let toolbar = PadToolbar()
@@ -20,7 +20,6 @@ final class OverlayViewController: UIViewController {
     private let fpsLabel = UILabel()
     private let tickFeedback = UISelectionFeedbackGenerator()
     private let clickFeedback = UIImpactFeedbackGenerator(style: .light)
-    private var keyboardShown = false
     private var frameLink: CADisplayLink?
     private var sampleTime: CFTimeInterval = 0
     private var sampleFrames: UInt64 = 0
@@ -35,17 +34,17 @@ final class OverlayViewController: UIViewController {
     /// - Parameters:
     ///   - input: The running game's input, or `nil` for the layout editor in Settings.
     ///   - settings: The player's settings: vibration turns the controls' haptics on.
-    ///   - layoutFile: Where the controller layout is saved, or `nil` when there's no container to save it in.
+    ///   - layoutFile: Where the controller layout is saved.
     ///   - onFinishEditing: Called when the editor's Done closes the Settings editor.
     init(
-        input: (any GameInput)?, settings: GameSettings, layoutFile: URL?, onFinishEditing: (() -> Void)?
+        input: (any GameInput)?, settings: GameSettings, layoutFile: URL, onFinishEditing: (() -> Void)?
     ) {
         self.input = input
         vibration = settings.vibration
         showFPS = settings.fpsCounter
         self.layoutFile = layoutFile
         self.onFinishEditing = onFinishEditing
-        let layout = layoutFile.map { PadLayout.load(from: $0) } ?? .default
+        let layout = PadLayout.load(from: layoutFile)
         padView = PadView(input: input, layout: layout)
         gameView = input.map { GameTouchView(input: $0) }
         super.init(nibName: nil, bundle: nil)
@@ -96,13 +95,24 @@ final class OverlayViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // The controls and tools keep off the camera housing, as the game's window does; the game's area takes the
+        // whole screen, as touches there arrive in screen points.
+        let area = view.bounds.inset(by: view.window.map { SensorHousing.insets(of: $0) } ?? .zero)
         gameView?.frame = view.bounds
-        padView.frame = view.bounds
-        toolbar.frame = view.bounds
-        hint.frame = view.bounds.insetBy(dx: 40, dy: 0).divided(atDistance: 60, from: .maxYEdge).slice
+        padView.frame = area
+        toolbar.frame = area
+        hint.frame = area.insetBy(dx: 40, dy: 0).divided(atDistance: 60, from: .maxYEdge).slice
         fpsLabel.frame = CGRect(
             x: view.safeAreaInsets.left + 12, y: view.safeAreaInsets.top + 8, width: 112, height: 30)
         refresh()
+    }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        // Turning the phone round keeps the size but moves the camera housing to the other side.
+        coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+            self?.view.setNeedsLayout()
+        }
     }
 
     private func configureFPSCounter() {
@@ -153,8 +163,8 @@ final class OverlayViewController: UIViewController {
         } else {
             tools = PadTool.playing
         }
-        // From the view itself: the pad view measures itself only after this layout pass.
-        let geometry = PadGeometry(width: view.bounds.width, height: view.bounds.height)
+        // From the frame set above: the pad view measures itself only after this layout pass.
+        let geometry = PadGeometry(width: toolbar.frame.width, height: toolbar.frame.height)
         toolbar.show(
             tools,
             removed: padView.controller.layout.removedControls,
@@ -177,8 +187,10 @@ final class OverlayViewController: UIViewController {
             padView.updateLayout { layout, _ in layout.hidden = tool == .hide }
             saveLayout()
         case .keyboard:
-            keyboardShown.toggle()
-            input?.setKeyboardVisible(keyboardShown)
+            // From SDL's state, not a flag of our own: the game also shows and hides it as its text fields gain focus.
+            if let input {
+                input.setKeyboardVisible(!input.isKeyboardVisible)
+            }
         case .remove:
             padView.updateLayout { layout, editor in editor.removeSelected(from: &layout) }
         case .smaller, .bigger:
@@ -209,10 +221,6 @@ final class OverlayViewController: UIViewController {
     }
 
     private func saveLayout() {
-        guard let layoutFile else {
-            // No container to save in: the layout lasts as long as the overlay.
-            return
-        }
         do {
             try padView.controller.layout.save(to: layoutFile)
         } catch {

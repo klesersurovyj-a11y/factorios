@@ -21,21 +21,25 @@ final class GameSession {
         "SDL_TOUCH_MOUSE_EVENTS": "0",
         // The accelerometer would show up as a second joystick.
         "SDL_ACCELEROMETER_AS_JOYSTICK": "0",
+        // The on-screen pad is the overlay's, not a focused window's: without this, SDL drops presses and stick moves
+        // away from the first value it saw whenever its window isn't key, so a stick stays stuck off centre.
+        "SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS": "1",
     ]
 
     private let paths: GamePaths
     private let launcherWindow: UIWindow
-    private let makeOverlay: @MainActor (any GameInput, GameSettings) -> UIViewController
+    private let makeOverlay: @MainActor (GamePaths, any GameInput, GameSettings) -> UIViewController
     private var overlayWindow: UIWindow?
     private var gameWindow: UIWindow?
     private var input: SDLGameInput?
     private var margin: CGFloat = 0
     private var observers: [any NSObjectProtocol] = []
+    private var geometryObservation: NSKeyValueObservation?
 
     init(
         paths: GamePaths,
         launcherWindow: UIWindow,
-        overlay: @escaping @MainActor (any GameInput, GameSettings) -> UIViewController
+        overlay: @escaping @MainActor (GamePaths, any GameInput, GameSettings) -> UIViewController
     ) {
         self.paths = paths
         self.launcherWindow = launcherWindow
@@ -63,7 +67,7 @@ final class GameSession {
         margin = CGFloat(settings.frame.rawValue)
         launcherWindow.isHidden = true
         launcherWindow.rootViewController = nil
-        overlayWindow = RuntimeWindows.makeOverlayWindow(root: makeOverlay(gameInput, settings))
+        overlayWindow = RuntimeWindows.makeOverlayWindow(root: makeOverlay(paths, gameInput, settings))
         observeWindows()
         observeLifecycle()
         let arguments = arguments(for: request)
@@ -77,13 +81,13 @@ final class GameSession {
     /// Writes config.ini from the settings and saves what that changed (whether light graphics are applied).
     private func prepareSettings() throws -> GameSettings {
         let store = SettingsStore(file: paths.settingsFile)
-        let keyboardAndMouse = GCKeyboard.coalesced != nil && GCMouse.current != nil
-        let settings = try FactorioConfig.write(
-            paths: paths,
-            settings: store.load(),
-            keyboardAndMouse: keyboardAndMouse,
-            supportsBCTextures: MTLCreateSystemDefaultDevice()?.supportsBCTextureCompression ?? false
+        let screen = RuntimeWindows.windowScene.screen.nativeBounds
+        let device = FactorioConfig.Device(
+            keyboardAndMouse: GCKeyboard.coalesced != nil && GCMouse.current != nil,
+            supportsBCTextures: MTLCreateSystemDefaultDevice()?.supportsBCTextureCompression ?? false,
+            screenHeight: Int(min(screen.width, screen.height))
         )
+        let settings = try FactorioConfig.write(paths: paths, settings: store.load(), device: device)
         try store.save(settings)
         return settings
     }
@@ -102,7 +106,6 @@ final class GameSession {
     }
 
     private func configureSDL(_ settings: GameSettings) {
-        FOSSDLSetMainReady()
         var hints = Self.hints
         if settings.detailedLogs {
             hints["SDL_LOGGING"] = "*=verbose"
@@ -153,10 +156,9 @@ final class GameSession {
                 forName: name,
                 object: nil,
                 queue: .main
-            ) { [weak self] notification in
-                let window = notification.object as? UIWindow
+            ) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    self?.adoptGameWindow(candidate: window)
+                    self?.adoptGameWindow()
                 }
             }
             observers.append(observer)
@@ -183,36 +185,37 @@ final class GameSession {
         observers += [background, foreground]
     }
 
-    /// Adopts SDL's game window once.
+    /// Adopts SDL's game window once, and fits it again whenever the scene turns.
     ///
-    /// SDL's UIKit backend creates a plain `UIWindow`, so the class can't identify it. SDL itself is asked first:
-    /// the UIWindow in the game's first SDL window's SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER property. Only when SDL
-    /// has a window but doesn't expose that property is the notifying visible window taken, provided it is neither
-    /// the launcher nor the overlay window FactoriOS created.
-    private func adoptGameWindow(candidate: UIWindow?) {
-        guard gameWindow == nil, let window = FOSSDLGameWindow() ?? fallbackGameWindow(candidate) else {
+    /// SDL's UIKit backend creates a plain `UIWindow`, so the class can't identify it; SDL is asked instead, for the
+    /// UIWindow in the game's first SDL window's SDL_PROP_WINDOW_UIKIT_WINDOW_POINTER property.
+    private func adoptGameWindow() {
+        guard gameWindow == nil, let window = FOSSDLGameWindow() else {
             // Already adopted, or SDL hasn't created the game's window yet; a later notification brings it.
             return
         }
         gameWindow = window
-        var frame = window.frame
-        if margin > 0 {
-            let screen = window.windowScene?.screen.bounds ?? RuntimeWindows.screenBounds
-            frame = screen.insetBy(dx: margin, dy: margin)
-            // The margin shows what is behind the game's window: nothing, which is black.
-            window.backgroundColor = .black
-            FOSCompatSetWindowFrame(window, frame)
+        fitGameWindow()
+        // Turning the phone round moves the camera housing to the other side.
+        geometryObservation = window.windowScene?.observe(\.effectiveGeometry) { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                self?.fitGameWindow()
+            }
         }
-        input?.gameWindowFrame = frame
     }
 
-    /// The notifying window as SDL's, for an SDL that has a window but no UIKit window property.
-    private func fallbackGameWindow(_ candidate: UIWindow?) -> UIWindow? {
-        guard FOSSDLHasWindow(), let candidate, !candidate.isHidden else {
-            // No SDL window yet, or nothing visible to take.
-            return nil
+    /// Puts the game's window on the screen less the camera housing's side and the Frame margin, and tells the input.
+    private func fitGameWindow() {
+        guard let window = gameWindow else {
+            // Not adopted yet.
+            return
         }
-        let isOurs = candidate === launcherWindow || candidate === overlayWindow
-        return isOurs ? nil : candidate
+        let screen = RuntimeWindows.windowScene.screen.bounds
+        let housing = overlayWindow.map { SensorHousing.insets(of: $0) } ?? .zero
+        let frame = screen.inset(by: housing).insetBy(dx: margin, dy: margin)
+        // Round the frame is what is behind the game's window: nothing, which is black.
+        window.backgroundColor = .black
+        FOSCompatSetWindowFrame(window, frame)
+        input?.gameWindowFrame = frame
     }
 }

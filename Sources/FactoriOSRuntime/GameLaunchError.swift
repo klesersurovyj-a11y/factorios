@@ -1,7 +1,7 @@
 import Foundation
 
 /// Why the converted game couldn't be started.
-enum GameLaunchError: Error, LocalizedError, Equatable {
+enum GameLaunchError: Error, LocalizedError {
     /// The converted library or its slot manifest is missing or unreadable.
     case notInstalled
     /// dyld refused the converted library.

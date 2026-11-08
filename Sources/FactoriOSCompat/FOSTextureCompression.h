@@ -17,9 +17,6 @@ MTLPixelFormat FOSBCDecodedFormat(MTLPixelFormat format);
 /// Bytes per texel of `FOSBCDecodedFormat(format)`; 0 when that is MTLPixelFormatInvalid.
 NSUInteger FOSBCDecodedBytesPerPixel(MTLPixelFormat format);
 
-/// Bytes per 4×4 block: 8 for BC1 and BC4, 16 for BC2, BC3 and BC5; 0 for formats the decoder doesn't handle.
-NSUInteger FOSBCBlockBytes(MTLPixelFormat format);
-
 /// Decodes a `width`×`height` texel image of `format` (one of the formats FOSBCDecodedFormat handles).
 ///
 /// - Parameters:

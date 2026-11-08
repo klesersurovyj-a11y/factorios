@@ -2,9 +2,7 @@
 #import "FOSAppKit.h"
 
 @import Darwin;
-@import MachO;
 @import Metal;
-@import UIKit;
 
 #pragma mark - State set by the runtime
 
@@ -37,28 +35,6 @@ static __unsafe_unretained id fosNSApp = nil;
 #pragma mark - Foundation: NSAppleEventManager
 
 @implementation FOSAppleEventManager
-
-+ (FOSAppleEventManager *)sharedAppleEventManager {
-    static FOSAppleEventManager *manager;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        manager = [[FOSAppleEventManager alloc] init];
-    });
-    return manager;
-}
-
-- (void)setEventHandler:(nullable id)handler
-            andSelector:(SEL)selector
-          forEventClass:(uint32_t)eventClass
-             andEventID:(uint32_t)eventID {
-    // iOS delivers URLs through the scene lifecycle, not Apple Events.
-    (void)handler, (void)selector, (void)eventClass, (void)eventID;
-}
-
-- (void)removeEventHandlerForEventClass:(uint32_t)eventClass andEventID:(uint32_t)eventID {
-    (void)eventClass, (void)eventID;
-}
-
 @end
 
 #pragma mark - ApplicationServices
@@ -73,54 +49,13 @@ static Boolean fos_UAZoomEnabled(void) {
 
 typedef uint32_t FOSIOPMAssertionID;
 typedef int32_t FOSIOReturn;
-static const FOSIOReturn FOSIOReturnSuccess = 0;                       // kIOReturnSuccess
-static const FOSIOReturn FOSIOReturnBadArgument = (int32_t)0xE00002C2U;  // kIOReturnBadArgument
-static const FOSIOReturn FOSIOReturnNotFound = (int32_t)0xE00002F0U;     // kIOReturnNotFound
+static const FOSIOReturn FOSIOReturnNotFound = (int32_t)0xE00002F0U;  // kIOReturnNotFound
 
-/// Live assertion IDs; while any exists, the idle timer is off (iOS's counterpart of preventing display sleep).
-static NSMutableIndexSet *_Nullable fosAssertions = nil;
-static FOSIOPMAssertionID fosNextAssertion = 1;
-
-static void FOSApplyIdleTimer(BOOL disabled) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIApplication.sharedApplication.idleTimerDisabled = disabled;
-    });
-}
-
-static FOSIOReturn fos_IOPMAssertionCreateWithDescription(CFStringRef type, CFStringRef name, CFStringRef details,
-                                                          CFStringRef reason, CFStringRef bundlePath,
-                                                          CFTimeInterval timeout, CFStringRef timeoutAction,
-                                                          FOSIOPMAssertionID *assertionID) {
-    // Every assertion type the game asks for (display or system sleep) maps to the one iOS control.
-    (void)type, (void)name, (void)details, (void)reason, (void)bundlePath, (void)timeout, (void)timeoutAction;
-    if (assertionID == NULL) {
-        return FOSIOReturnBadArgument;
-    }
-    pthread_mutex_lock(&fosStateLock);
-    if (fosAssertions == nil) {
-        fosAssertions = [NSMutableIndexSet indexSet];
-    }
-    FOSIOPMAssertionID identifier = fosNextAssertion++;
-    [fosAssertions addIndex:identifier];
-    pthread_mutex_unlock(&fosStateLock);
-    *assertionID = identifier;
-    FOSApplyIdleTimer(YES);
-    return FOSIOReturnSuccess;
-}
-
+/// IOPMAssertionRelease. The game's own code releases an assertion (SystemUtil::preventSleep) but never creates one;
+/// only its static SDL's Cocoa backend does, which never runs, so there is never one to release.
 static FOSIOReturn fos_IOPMAssertionRelease(FOSIOPMAssertionID assertionID) {
-    pthread_mutex_lock(&fosStateLock);
-    BOOL known = [fosAssertions containsIndex:assertionID];
-    [fosAssertions removeIndex:assertionID];
-    BOOL anyLeft = fosAssertions.count > 0;
-    pthread_mutex_unlock(&fosStateLock);
-    if (!known) {
-        return FOSIOReturnNotFound;
-    }
-    if (!anyLeft) {
-        FOSApplyIdleTimer(NO);
-    }
-    return FOSIOReturnSuccess;
+    (void)assertionID;
+    return FOSIOReturnNotFound;
 }
 
 #pragma mark - OpenCL
@@ -222,20 +157,19 @@ static int fos_execv(const char *path, char *const argv[]) {
             [arguments addObject:argument];
         }
     }
+    // The runtime sets the handler before it loads the game, so it is there whenever the game can call execv.
     pthread_mutex_lock(&fosStateLock);
     void (^handler)(NSArray<NSString *> *) = fosRestartHandler;
     pthread_mutex_unlock(&fosStateLock);
-    if (handler != nil) {
-        NSArray<NSString *> *requested = [arguments copy];
-        if (NSThread.isMainThread) {
+    NSArray<NSString *> *requested = [arguments copy];
+    if (NSThread.isMainThread) {
+        handler(requested);
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
             handler(requested);
-        } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                handler(requested);
-            });
-        }
+        });
     }
-    // Reached only if the handler returned: report the failure exec would, which the game logs.
+    // Reached when the handler went to the main queue or returned: report the failure exec would, which the game logs.
     errno = EPERM;
     return -1;
 }
@@ -248,12 +182,10 @@ static pid_t fos_fork(void) {
 
 /// _NSGetExecutablePath: the imported game's macOS executable, so the game finds its own files next to it.
 static int fos_NSGetExecutablePath(char *buffer, uint32_t *bufferSize) {
+    // The runtime sets the path before it loads the game, so it is there whenever the game can ask.
     pthread_mutex_lock(&fosStateLock);
-    char *path = fosExecutablePath != NULL ? strdup(fosExecutablePath) : NULL;
+    char *path = strdup(fosExecutablePath);
     pthread_mutex_unlock(&fosStateLock);
-    if (path == NULL) {
-        return _NSGetExecutablePath(buffer, bufferSize);
-    }
     size_t needed = strlen(path) + 1;
     int result = 0;
     if (needed > *bufferSize) {
@@ -269,17 +201,16 @@ static int fos_NSGetExecutablePath(char *buffer, uint32_t *bufferSize) {
 #pragma mark - The table
 
 const FOSSymbolReplacement *FOSCompatReplacements(size_t *count) {
-    static FOSSymbolReplacement table[17];
+    static FOSSymbolReplacement table[16];
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        FOSSymbolReplacement entries[17] = {
+        FOSSymbolReplacement entries[16] = {
             {"_NSApp", (const void *)&fosNSApp},
             {"_OBJC_CLASS_$_NSAppleEventManager", (__bridge const void *)[FOSAppleEventManager class]},
             {"_OBJC_CLASS_$_NSBitmapImageRep", (__bridge const void *)[FOSBitmapImageRep class]},
             {"_OBJC_CLASS_$_NSColorSpace", (__bridge const void *)[FOSColorSpace class]},
             {"_OBJC_CLASS_$_NSWorkspace", (__bridge const void *)[FOSWorkspace class]},
             {"_UAZoomEnabled", (const void *)fos_UAZoomEnabled},
-            {"_IOPMAssertionCreateWithDescription", (const void *)fos_IOPMAssertionCreateWithDescription},
             {"_IOPMAssertionRelease", (const void *)fos_IOPMAssertionRelease},
             {"_clGetPlatformIDs", (const void *)fos_clGetPlatformIDs},
             {"_clGetDeviceIDs", (const void *)fos_clGetDeviceIDs},

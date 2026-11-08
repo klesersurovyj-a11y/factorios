@@ -9,7 +9,7 @@ flowchart TB
     App --> Runtime
     UI --> Runtime[FactoriOSRuntime<br/>load, run]
     UI --> Core
-    Runtime --> Core[FactoriOSCore<br/>disk image, Mach-O, signing, settings<br/>builds on Linux]
+    Runtime --> Core[FactoriOSCore<br/>disk image, Mach-O, settings, controls<br/>builds on Linux]
     Runtime --> Compat[FactoriOSCompat<br/>Objective-C: Mac APIs on UIKit/Metal, SDL3 bridge]
     App --> SDL[SDL3.xcframework<br/>SDL for iOS]
 ```
@@ -52,7 +52,7 @@ UDIF disk images with bzip2, zlib, raw and zero chunks; HFS+ and HFSX volumes wi
 - `Sources/FactoriOSCore/DiskImage/UDIFImage.swift`: `UDIFImage`, `UDIFPartition`, `UDIFImage.open`, `UDIFImage.hfsPartition`
 - `Sources/FactoriOSCore/DiskImage/BZip2.swift`: `BZip2`, `BZip2.decompress`
 - `Sources/FactoriOSCore/DiskImage/Inflate.swift`: `Inflate`, `Inflate.decompressZlib`
-- `Sources/FactoriOSCore/DiskImage/HFSPlusVolume.swift`: `HFSPlusVolume`, `HFSPlusVolume.lookup`, `HFSPlusVolume.children`
+- `Sources/FactoriOSCore/DiskImage/HFSPlusVolume.swift`: `HFSPlusVolume`, `HFSPlusVolume.children`
 - `Sources/FactoriOSCore/DiskImage/HFSPlusVolume+Extraction.swift`: `HFSPlusVolume.extract`
 - `Sources/FactoriOSCore/DiskImage/HFSItem.swift`: `HFSItem`, `HFSItem.Kind`
 - `Sources/FactoriOSCore/DiskImage/DiskImageError.swift`: `DiskImageError`, `ExtractionProgress`
@@ -74,30 +74,15 @@ recorded.
 - `Sources/FactoriOSCore/MachO/BindStreamWalker.swift`: `BindStreamWalker`
 - `Sources/FactoriOSCore/MachO/LibraryLinking.swift`: `LibraryLinking`
 
-### FactoriOSCore: code signing
-
-A portable embedded-signature implementation: CodeDirectory 0x20400 (SHA-256, 4 KiB pages), empty requirements,
-optional entitlements (XML and DER), and a detached CMS SignedData with Apple's CDHash attributes, built with
-SwiftASN1. The Mac prepare task delegates signing to `codesign` so Xcode's provisioning identity is applied exactly as
-it is to the app; the portable signer is kept for producing signatures without macOS tooling.
-
-- `Sources/FactoriOSCore/CodeSigning/SigningIdentity.swift`: `SigningIdentity`
-- `Sources/FactoriOSCore/CodeSigning/MachOSigner.swift`: `MachOSigner`, `MachOSigner.sign`
-- `Sources/FactoriOSCore/CodeSigning/SigningError.swift`: `SigningError`
-- `Sources/FactoriOSCore/CodeSigning/CodeSignatureBlobs.swift`: `CodeSignatureBlobs`, `CodeDirectory`
-- `Sources/FactoriOSCore/CodeSigning/CMSSignature.swift`: `CMSSignature`
-- `Sources/FactoriOSCore/CodeSigning/DEREntitlements.swift`: `DEREntitlements`
-- `Sources/FactoriOSCore/CodeSigning/MachOSignatureLayout.swift`: `MachOSignatureLayout`
-
 ### FactoriOSCore: game, settings and controls
 
 - `Sources/FactoriOSCore/Game/GamePaths.swift`: `GamePaths`, `GamePaths.standard`, `GamePaths.bundledLibrary`
 - `Sources/FactoriOSCore/Game/GameLibrary.swift`: `GameLibrary`, `GameLibrary.redirectedSymbols`, `GameLibrary.convert`, `GameLibrary.write`, `GameLibrary.isBundled`
-- `Sources/FactoriOSCore/Game/GameSettings.swift`: `GameSettings`, `GameSettings.SpriteQuality`, `GameSettings.FrameRate`, `GameSettings.Frame`
+- `Sources/FactoriOSCore/Game/GameSettings.swift`: `GameSettings`, `GameSettings.SpriteQuality`, `GameSettings.FrameRate`, `GameSettings.Frame`, `GameSettings.UIScale`
 - `Sources/FactoriOSCore/Game/SettingsStore.swift`: `SettingsStore`, `SettingsStore.load`, `SettingsStore.save`
-- `Sources/FactoriOSCore/Game/FactorioConfig.swift`: `FactorioConfig`, `FactorioConfig.update`, `FactorioConfig.write`
+- `Sources/FactoriOSCore/Game/FactorioConfig.swift`: `FactorioConfig`, `FactorioConfig.Device`, `FactorioConfig.update`, `FactorioConfig.write`
 - `Sources/FactoriOSCore/Game/SaveLibrary.swift`: `SaveLibrary`, `SaveFile`, `SaveLibraryError`
-- `Sources/FactoriOSCore/Game/LaunchRequest.swift`: `LaunchRequest`, `SessionEnd`
+- `Sources/FactoriOSCore/Game/LaunchRequest.swift`: `LaunchRequest`
 - `Sources/FactoriOSCore/Game/GameInput.swift`: `GameInput`, `PadButton`, `PadAxis`
 - `Sources/FactoriOSCore/Game/PadLayout.swift`: `PadLayout`, `PadLayout.Placement`
 - `Sources/FactoriOSCore/Game/PadControlID.swift`: `PadControlID`, `PadStick`, `PadControlKind`, `PadAnchor`
@@ -123,6 +108,7 @@ the UI only draws them and feeds them touches.
 - `Sources/FactoriOSRuntime/RuntimeWindows.swift`: `RuntimeWindows`, `PassthroughWindow`, `RestartPrompt`
 - `Sources/FactoriOSRuntime/RuntimeLog.swift`: `RuntimeLog`
 - `Sources/FactoriOSRuntime/PresentedFrames.swift`: `PresentedFrames`, `PresentedFrames.current`
+- `Sources/FactoriOSRuntime/SensorHousing.swift`: `SensorHousing`, `SensorHousing.insets`
 
 The Mac prepare step imports and converts the game, signs the library with the identity that signs the app, and
 embeds it in the app bundle; the launcher only finds the already-prepared library and game data. Launch: `config.ini`;
@@ -135,16 +121,19 @@ on Apple's developer-only Metal HUD.
 ### FactoriOSCompat
 
 - `Sources/FactoriOSCompat/include/FactoriOSCompat.h`: `FOSSymbolReplacement`, `FOSCompatReplacements`, `FOSCompatWriteSlot`, `FOSCompatInstallMetalFixes`, `FOSCompatSetExecutablePath`, `FOSCompatSetRestartHandler`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatPresentedFrameCount`, `FOSCompatSetWindowFrame`
-- `Sources/FactoriOSCompat/include/FOSSDL.h`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLSetMainReady`, `FOSSDLSetHint`, `FOSSDLAttachVirtualGamepad`, `FOSSDLSetGamepadButton`, `FOSSDLSetGamepadAxis`, `FOSSDLWarpMouse`, `FOSSDLScrollWheel`, `FOSSDLSetTextInputActive`, `FOSSDLGameWindow`
-- `Sources/FactoriOSCompat/FOSAppKit.h`: `FOSColorSpace`, `FOSBitmapImageRep`, `FOSWorkspace`
+- `Sources/FactoriOSCompat/include/FOSSDL.h`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLSetHint`, `FOSSDLAttachVirtualGamepad`, `FOSSDLSetGamepadButton`, `FOSSDLSetGamepadAxis`, `FOSSDLWarpMouse`, `FOSSDLScrollWheel`, `FOSSDLSetScreenKeyboardShown`, `FOSSDLScreenKeyboardShown`, `FOSSDLGameWindow`
+- `Sources/FactoriOSCompat/FOSAppKit.h`: `FOSAppleEventManager`, `FOSColorSpace`, `FOSBitmapImageRep`, `FOSWorkspace`
 - `Sources/FactoriOSCompat/FOSImageRep.m`: `FOSColorSpace`, `FOSBitmapImageRep`
 - `Sources/FactoriOSCompat/FOSWorkspace.m`: `FOSWorkspace`
-- `Sources/FactoriOSCompat/FOSReplacements.m`: `FOSCompatReplacements`, `fos_execv`, `fos_fork`, `fos_NSGetExecutablePath`
+- `Sources/FactoriOSCompat/FOSReplacements.m`: `FOSAppleEventManager`, `FOSCompatReplacements`, `fos_execv`, `fos_fork`, `fos_NSGetExecutablePath`
 - `Sources/FactoriOSCompat/FOSMetalFixes.m`: `FOSCompatInstallMetalFixes`, `FOSCompatSetBackgrounded`, `FOSCompatSetFrameRateCap`, `FOSCompatPresentedFrameCount`
-- `Sources/FactoriOSCompat/FOSTextureCompression.h`: `FOSBCDecodedFormat`, `FOSBCDecodedBytesPerPixel`, `FOSBCBlockBytes`, `FOSBCDecode`
-- `Sources/FactoriOSCompat/FOSTextureCompression.m`: `FOSBCDecodedFormat`, `FOSBCDecodedBytesPerPixel`, `FOSBCBlockBytes`, `FOSBCDecode`
+- `Sources/FactoriOSCompat/FOSTextureCompression.h`: `FOSBCDecodedFormat`, `FOSBCDecodedBytesPerPixel`, `FOSBCDecode`
+- `Sources/FactoriOSCompat/FOSTextureCompression.m`: `FOSBCDecodedFormat`, `FOSBCDecodedBytesPerPixel`, `FOSBCDecode`
 - `Sources/FactoriOSCompat/FOSSDL.m`: `FOSSDLLoad`, `FOSSDLRunApp`, `FOSSDLGameWindow`
 - `Sources/FactoriOSCompat/FOSWindowFrame.m`: `FOSCompatSetWindowFrame`
+
+`FOSSDL.m` also swizzles SDL's `SDL_uikitviewcontroller` `setTextInputRect:` to convert the game's pixel rectangle to
+points, so the keyboard lifts the text field correctly at native resolution.
 
 #### Compatibility map
 
@@ -154,6 +143,7 @@ are filled into the slots the converter recorded; Metal rows change the live Met
 | Mac API | Member | FactoriOS | iOS backing |
 |---|---|---|---|
 | `_NSApp` | `fosNSApp` | `fosNSApp` | a nil object: the game's menu-bar code sends its messages to nil |
+| `NSAppleEventManager` | `FOSAppleEventManager` | `FOSAppleEventManager` | an empty class: only the static SDL Cocoa backend (never run) messages it; the slot lets the library load |
 | `NSBitmapImageRep` | `imageRepWithData:` | `FOSBitmapImageRep` | ImageIO decode to 8-bit RGBA |
 | `NSBitmapImageRep` | `bitmapData` | `FOSBitmapImageRep` | the decoded pixel buffer |
 | `NSBitmapImageRep` | `bitsPerPixel` | `FOSBitmapImageRep` | 32 |
@@ -168,11 +158,10 @@ are filled into the slots the converter recorded; Metal rows change the live Met
 | `NSColorSpace` | `CGColorSpace` | `FOSColorSpace` | the wrapped `CGColorSpaceRef` |
 | `NSWorkspace` | `sharedWorkspace` | `FOSWorkspace` | a singleton |
 | `NSWorkspace` | `activateFileViewerSelectingURLs:` | `FOSWorkspace` | opens the folder in Files (`shareddocuments://`) |
-| `_UAZoomEnabled` | `fos_UAZoomEnabled` | `fos_UAZoomEnabled` | `UIAccessibilityIsZoomEnabled` |
-| `_IOPMAssertionCreateWithDescription` | `fos_IOPMAssertionCreateWithDescription` | `fos_IOPMAssertionCreateWithDescription` | `UIApplication.idleTimerDisabled` |
-| `_IOPMAssertionRelease` | `fos_IOPMAssertionRelease` | `fos_IOPMAssertionRelease` | `UIApplication.idleTimerDisabled` |
+| `_UAZoomEnabled` | `fos_UAZoomEnabled` | `fos_UAZoomEnabled` | false: iOS has no API to ask |
+| `_IOPMAssertionRelease` | `fos_IOPMAssertionRelease` | `fos_IOPMAssertionRelease` | the game never creates an assertion: `kIOReturnNotFound` |
 | `_clGetPlatformIDs` | `fos_clGetPlatformIDs` | `fos_clGetPlatformIDs` | iOS has no OpenCL: `CL_PLATFORM_NOT_FOUND_KHR` |
-| `_clGetDeviceIDs` | `fos_clGetDeviceIDs` | `fos_clGetDeviceIDs` | no OpenCL: `CL_DEVICE_NOT_FOUND` |
+| `_clGetDeviceIDs` | `fos_clGetDeviceIDs` | `fos_clGetDeviceIDs` | no OpenCL platform: `CL_INVALID_PLATFORM` |
 | `_clGetDeviceInfo` | `fos_clGetDeviceInfo` | `fos_clGetDeviceInfo` | no OpenCL: `CL_INVALID_DEVICE` |
 | `_MTLCopyAllDevices` | `fos_MTLCopyAllDevices` | `fos_MTLCopyAllDevices` | `MTLCreateSystemDefaultDevice` in an array |
 | `_MTLCopyAllDevicesWithObserver` | `fos_MTLCopyAllDevicesWithObserver` | `fos_MTLCopyAllDevicesWithObserver` | the same; iOS's one GPU never changes |
@@ -215,11 +204,12 @@ are filled into the slots the converter recorded; Metal rows change the live Met
 - `Sources/FactoriOSUI/Overlay/PadToolbar.swift`: `PadToolbar`, `PadTool`
 
 Screens follow the Android launcher's features: welcome (build-and-install instructions when the prepared game is
-missing), home (Continue the newest save, Main menu), settings (resolution, FPS cap, frame, sprite quality, light
-graphics, FPS counter, detailed logs, vibration, controller layout), saves (import, export), logs (FactoriOS's and the
-game's, copy all), and the Factorio folder in the Files app. The overlay draws the on-screen controller, turns touches on the game into
-controller and mouse input (tap, double-tap-drag, long press, two-finger tap, pinch) and steps aside for a physical
-controller.
+missing), home (Continue the newest save, Main menu), settings (FPS cap, frame, UI size, sprite quality,
+light graphics, FPS counter, detailed logs, vibration, controller layout), saves (import, export), logs (FactoriOS's and
+the game's, copy all), and the Factorio folder in the Files app. The overlay draws the on-screen controller, turns
+touches on the game into controller and mouse input (tap, double-tap-drag, long press, two-finger tap, pinch zoom with
+Factorio's controller binding RT + D-pad up/down, two-finger scroll) and steps aside for a physical controller. The
+game's window and the controls keep off the camera housing's side of the screen, following the phone as it turns.
 
 ### FactoriOSApp
 
@@ -235,21 +225,22 @@ from the data container.
 
 - `Sources/FactoriOSPrepare/main.swift`: `Options`, `SourceStamp`, `importIfNeeded`, `sign`
 
-## Deferred: verified only on a device
+## Device status
 
-Nothing below has run on a device. CI compiles every target for `arm64-apple-ios17.0`, builds SDL3 and runs the static
-checks, but that proves no device behaviour. Each item is **deferred, not verified**:
+Factorio 2.1.24 runs on an iPhone 14 (A15, iOS 26.6.1). CI compiles every target for `arm64-apple-ios17.0`, builds
+SDL3 and runs the static checks.
 
-| Area | What has to be seen on a device |
+| Area | Status |
 |---|---|
-| Build and install | The generated Xcode workspace builds, signs and installs FactoriOS, and the launcher opens on an iOS 17 or later device. |
-| Provisioning | Xcode's automatic signing installs the app, `mise run device` re-signs it after embedding the library, and iOS still launches it. |
-| Import | The game data copied into the app container is visible and writable through the Files app. Hard links, the extents overflow tree and compressed files were absent from the demo image, so those paths have never run on real data. |
-| Signing | The embedded library, signed with the Personal Team Apple Development identity that provisioned FactoriOS, passes library validation and `dlopen`s from the app bundle (feasibility gate 1). |
-| Loading | dyld accepts a macOS binary retagged as iOS; weak imports from missing frameworks resolve to zero; the slots fill. |
-| SDL | The game's static SDL3 forwards to the bundled SDL3, and SDL's window, touch, audio and controllers work with the game's entry point running inside SDL's main callback (gate 2). |
-| Metal | The 110 shaders compile on iOS; rendering with managed storage turned into shared storage; the frame-rate cap and background frame gate (gate 3). |
-| Memory and CPU | The demo fits the device's memory limit and runs on its CPU (gate 4). |
-| Compatibility layer | Each replacement in the table below behaves as the game expects (image decoding above all). |
-| Launcher and controller | Every screen, the on-screen controller, layout editor, touch gestures, haptics, physical controllers and keyboards. |
-| Restart | The game's `execv` restart request reaches the player as "reopen FactoriOS". |
+| Build and install | Verified: the generated Xcode workspace builds, signs and installs FactoriOS; the launcher opens. |
+| Provisioning | Verified: `mise run device` re-signs the app after embedding the library and iOS launches it. |
+| Import | Verified on the 2.1.24 image. Hard links, the extents overflow tree and compressed files were absent from it, so those paths have never run on real data. |
+| Signing | Verified: the library, signed on the Mac with `codesign` and the Personal Team identity, passes library validation and `dlopen`s from the app bundle (feasibility gate 1). |
+| Loading | Verified: dyld accepts the retagged binary; weak imports resolve to zero; the slots fill. |
+| SDL | Verified: window, touch, keyboard and audio with the game's entry point inside SDL's main callback (gate 2). Physical controllers unverified. |
+| Metal | Verified: rendering at native resolution, 60 FPS (gate 3). |
+| Memory and CPU | Verified with Medium sprites: main menu and saves load; High sprites exceed the ~3.2 GB limit (gate 4). |
+| Compatibility layer | Exercised by the runs above; each replacement in the table above. |
+| Launcher and controller | Verified: on-screen controller, touch gestures, pinch zoom, keyboard, camera-housing dead zone. Physical controllers unverified. |
+| Restart | Unverified: the game's `execv` restart request reaching the player as "reopen FactoriOS". |
+| Simulator | Unverified: the game has not been run in the simulator. |

@@ -1,8 +1,9 @@
 # Building
 
-FactoriOS is a Swift package that [xtool](https://github.com/xtool-org/xtool) builds into an iOS app, on Linux, WSL
-or macOS. Tools are pinned with [mise](https://mise.jdx.dev): `mise.toml` holds what every machine shares,
-`mise.local.toml` (not committed) what one machine needs.
+FactoriOS is a Swift package that [xtool](https://github.com/xtool-org/xtool) turns into an Xcode project; building the
+app needs macOS with Xcode (SDL3 is built from source). `mise run check` and `mise run inspect` also run on Linux or WSL.
+Tools are pinned with [mise](https://mise.jdx.dev): `mise.toml` holds what every machine shares, `mise.local.toml`
+(not committed) what one machine needs.
 
 ## Tools
 
@@ -35,7 +36,6 @@ FACTORIOS_DMG = "/path/to/factorio_mac.dmg"
 | `mise run build-device` | builds and signs for the configured device with Xcode automatic signing | macOS with Xcode |
 | `mise run prepare-game` | imports, converts and signs `$FACTORIOS_DMG` into `artifact/game/FactoriOS` | macOS with Xcode |
 | `mise run device` | builds the app and the game, installs both on the configured device and launches it | macOS with Xcode |
-| `mise run dev` | builds, signs and installs directly through xtool | an xtool development machine |
 
 `check` sets `FACTORIOS_CORE_ONLY` for its host build, which hides the iOS-only targets. `check-ios` needs Xcode's iOS
 SDK because clang-tidy and the cross-compile resolve UIKit, Metal and the Objective-C runtime through that SDK.
@@ -74,7 +74,7 @@ deliberately absent from the repository; `mise run inspect` remains the explicit
    Management before launching. This project targets developer-owned devices; it does not need an exported IPA,
    TestFlight or an App Store workflow.
 4. **The game:** `mise run device` also runs `factorios-prepare` on the Mac. It imports the disk image (skipped while
-   the image is unchanged), converts the executable with the same `FactoriOSCore` code the app uses, and signs the
+   the image is unchanged), converts the executable with `FactoriOSCore`'s converter, and signs the
    library with `codesign` using the certificate taken from the device build, so the library and the app share one
    identity. The task then copies `factorio.dylib` and `slots.json` into the app's `Frameworks` folder, re-signs the
    app, and installs it. `devicectl` copies the game data into the app's Application Support/FactoriOS, copying only
@@ -105,10 +105,10 @@ embedding the library.
 
 ### Device validation
 
-The source and iOS targets compile in CI, but no device run has happened. Do not report the demo as playable until
-this procedure passes. The four decisive runtime gates and the full verification matrix remain in
-[`feasibility.md`](feasibility.md#gates-only-a-device-can-close) and
-[`architecture.md`](architecture.md#deferred-verified-only-on-a-device).
+Factorio 2.1.24 has passed this procedure on an iPhone 14 (A15, iOS 26.6.1) with Medium sprites (High exceeds the
+~3.2 GB memory limit). Physical controllers and the restart prompt remain unverified. Results are recorded in
+[`feasibility.md`](feasibility.md#device-gates) and [`architecture.md`](architecture.md#device-status); repeat the
+procedure for each new device or game version.
 
 #### Prerequisites
 

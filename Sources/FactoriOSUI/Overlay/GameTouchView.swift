@@ -11,8 +11,9 @@ class PassthroughView: UIView {
 
 /// The game's area: fingers on it become `TouchGestures` (cursor, A, X, B, zoom).
 ///
-/// The overlay fills the screen, as SDL's game window does, so its points are the game window's points. A mouse or
-/// trackpad isn't a finger: SDL reads it through GameController's `GCMouse`, so its touches are ignored here.
+/// It fills the screen, so its points are screen points; the input turns them into the game window's, which may be
+/// inset by the camera housing and the Frame margin. A mouse or trackpad isn't a finger: SDL reads it through
+/// GameController's `GCMouse`, so its touches are ignored here.
 final class GameTouchView: UIView {
     private let gestures: TouchGestures
 

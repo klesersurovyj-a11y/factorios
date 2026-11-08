@@ -4,8 +4,9 @@ import Foundation
 /// Factorio's controller mode understands.
 ///
 /// Tap: moves the cursor there and taps A. Double tap and keep the finger down: holds A along the drag. Long press:
-/// holds X, the cursor following the finger. Two-finger tap: B. Pinch: zoom (the mouse wheel). Two-finger drag:
-/// scrolls. A single-finger drag moves the cursor.
+/// holds X, the cursor following the finger. Two-finger tap: B. Pinch: zoom, with Factorio's controller binding for it
+/// (RT held while the D-pad taps up or down), as the game is in controller mode. Two-finger drag: scrolls (the
+/// mouse wheel). A single-finger drag moves the cursor.
 @MainActor
 public final class TouchGestures {
     /// One finger until a second lands; then undecided, pinching or scrolling, and lifted once one of the two lifts.
@@ -31,6 +32,7 @@ public final class TouchGestures {
 
     private let input: any GameInput
     private let presses: TimedPresses
+    private let zoom: ControllerZoom
     private let clock = ContinuousClock()
 
     /// The fingers down, oldest first; the two oldest pinch and scroll.
@@ -51,6 +53,7 @@ public final class TouchGestures {
     public init(input: any GameInput) {
         self.input = input
         presses = TimedPresses(input: input)
+        zoom = ControllerZoom(input: input)
     }
 
     /// A finger lands at `point`.
@@ -112,6 +115,7 @@ public final class TouchGestures {
     /// The system took the touches (an alert, the app leaving the screen): let go of everything.
     public func cancelled() {
         cancelLongPress()
+        zoom.cancel()
         releaseHeld()
         fingers = []
         positions = [:]
@@ -198,8 +202,8 @@ public final class TouchGestures {
         if mode == .pinch, spanReference > 0, span > 0 {
             let steps = Int(log(span / spanReference) / log(Self.zoomStep))
             if steps != 0 {
-                // Spreading the fingers zooms in: the wheel up.
-                input.scroll(notches: Float(steps))
+                // Spreading the fingers zooms in.
+                zoom.zoom(steps)
                 spanReference *= pow(Self.zoomStep, Double(steps))
             }
         } else if mode == .scroll {
@@ -249,7 +253,7 @@ public final class TouchGestures {
 /// Button presses held at least three game ticks, so the game sees a quick tap.
 @MainActor
 private final class TimedPresses {
-    private static let minimumHold = Duration.milliseconds(50)
+    static let minimumHold = Duration.milliseconds(50)
 
     private let input: any GameInput
     private let clock = ContinuousClock()
@@ -283,5 +287,77 @@ private final class TimedPresses {
     func tap(_ button: PadButton) {
         hold(button)
         release(button)
+    }
+}
+
+/// Zooms with Factorio's controller binding: RT held while the D-pad taps up (in) or down (out), one tap a step.
+///
+/// Each change is held `TimedPresses.minimumHold` so the game sees RT down before the first tap and every tap apart.
+@MainActor
+private final class ControllerZoom {
+    private let input: any GameInput
+    /// Steps still to tap: positive zooms in.
+    private var pending = 0
+    private var task: Task<Void, Never>?
+
+    init(input: any GameInput) {
+        self.input = input
+    }
+
+    func zoom(_ steps: Int) {
+        pending += steps
+        guard task == nil else {
+            // The running taps pick the new steps up.
+            return
+        }
+        task = Task { [weak self] in
+            await self?.tapPending()
+        }
+    }
+
+    /// Lets go of RT and the D-pad and drops the steps not yet tapped.
+    func cancel() {
+        guard let task else {
+            // Nothing held.
+            return
+        }
+        task.cancel()
+        self.task = nil
+        pending = 0
+        input.setButton(.dpadUp, pressed: false)
+        input.setButton(.dpadDown, pressed: false)
+        input.setAxis(.rightTrigger, value: 0)
+    }
+
+    private func tapPending() async {
+        // A hold after RT goes down and after each tap: RT is down before the first tap, the taps stay apart, and
+        // steps added meanwhile are seen before RT is let go.
+        input.setAxis(.rightTrigger, value: 1)
+        guard await hold() else {
+            // cancel() released everything.
+            return
+        }
+        while pending != 0 {
+            let button: PadButton = pending > 0 ? .dpadUp : .dpadDown
+            pending -= pending.signum()
+            input.setButton(button, pressed: true)
+            guard await hold() else {
+                // cancel() released everything.
+                return
+            }
+            input.setButton(button, pressed: false)
+            guard await hold() else {
+                // cancel() released everything.
+                return
+            }
+        }
+        input.setAxis(.rightTrigger, value: 0)
+        task = nil
+    }
+
+    /// Waits one minimum hold; false when cancelled meanwhile.
+    private func hold() async -> Bool {
+        try? await Task.sleep(for: TimedPresses.minimumHold)
+        return !Task.isCancelled
     }
 }
