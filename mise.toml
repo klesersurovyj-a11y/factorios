@@ -1,15 +1,9 @@
-# Toolchain and tasks, for macOS with Xcode. Per-machine overrides (device, team, game, bundle ID) go in the uncommitted
-# mise.local.toml.
 [tools]
 swift = "6.4.2"
 swiftlint = "0.65.1"
 shellcheck = "0.11.0"
 "github:cpp-linter/clang-tools-static-binaries" = { version = "2026.09.01-5fb8802d", matching = "clang-tidy-23_", format = "raw", bin = "clang-tidy" }
-
-[tools."github:xtool-org/xtool"]
-version = "1.24.0"
-asset_pattern = "xtool.app.zip"
-bin_path = "xtool.app/Contents/Resources/bin"
+"github:xtool-org/xtool" = { version = "1.24.0", asset_pattern = "xtool.app.zip", bin_path = "xtool.app/Contents/Resources/bin" }
 
 [tasks.lint]
 description = "Lint Swift, Objective-C, scripts and property lists"
