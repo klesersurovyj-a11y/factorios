@@ -1,69 +1,35 @@
-# Toolchain and tasks, for macOS with Xcode. Per-machine values (device, team, game, bundle ID) live in the uncommitted mise.local.toml,
-# written by `mise run setup`.
+# Toolchain and tasks, for macOS with Xcode. Per-machine overrides (device, team, game, bundle ID) go in the uncommitted
+# mise.local.toml.
 [tools]
 swift = "6.4.2"
 swiftlint = "0.65.1"
-python = "3.12"
-uv = "0.13.7"
-"pipx:clang-tidy" = "23.1.4"
-"github:jdx/jactionlint" = "2.5.0"
 shellcheck = "0.11.0"
+"github:cpp-linter/clang-tools-static-binaries" = { version = "2026.09.01-5fb8802d", matching = "clang-tidy-23_", format = "raw", bin = "clang-tidy" }
 
 [tools."github:xtool-org/xtool"]
 version = "1.24.0"
 asset_pattern = "xtool.app.zip"
 bin_path = "xtool.app/Contents/Resources/bin"
 
-[tasks.setup]
-description = "Find your device, team and Factorio disk image"
-run = "python3 scripts/setup"
-
-[tasks.deploy]
-description = "Build, install and launch FactoriOS with the game on your device"
-depends = ["xcode-project"]
-run = "scripts/deploy"
-
-[tasks.simulator]
-description = "Launch the launcher in the iOS Simulator"
-depends = ["xcode-project"]
-run = "scripts/simulator"
-
 [tasks.lint]
-description = "Lint Swift, Objective-C, scripts, workflows and the compatibility map"
-run = """
-set -e
-swiftlint lint --strict --quiet
-swift format lint --strict --recursive --parallel Package.swift Sources
-python3 scripts/check-architecture
-jactionlint
-shellcheck scripts/deploy scripts/simulator scripts/prepare-sdl3.sh
-PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/factorios-pycache" python3 -m py_compile scripts/setup scripts/check-architecture
-plutil -lint -s Resources/*.plist Resources/*.entitlements
-clang-tidy --quiet Sources/FactoriOSCompat/*.m -- \
-  -x objective-c -fobjc-arc -fblocks -fmodules \
-  -fmodules-cache-path="${TMPDIR:-/tmp}/factorios-clang-modules" \
-  -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" \
-  -target arm64-apple-ios17.0 \
-  -ISources/FactoriOSCompat/include
-"""
+description = "Lint Swift, Objective-C, scripts and property lists"
+run = [
+  "swiftlint lint --strict --quiet",
+  "swift format lint --strict --recursive --parallel Package.swift Sources",
+  "shellcheck mise-tasks/*",
+  "plutil -lint -s Resources/*.plist Resources/*.entitlements",
+  'clang-tidy --quiet Sources/FactoriOSCompat/*.m -- --target=arm64-apple-ios17.0 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -fobjc-arc -fmodules -ISources/FactoriOSCompat/include',
+]
 
 [tasks.build]
 description = "Build the converter and the iOS targets for devices and the simulator"
-run = """
-set -e
-FACTORIOS_CORE_ONLY=1 swift build
-scripts/prepare-sdl3.sh
-for sdk in iphoneos iphonesimulator; do
-  triple=arm64-apple-ios17.0
-  [ "$sdk" = iphonesimulator ] && triple="$triple-simulator"
-  swift build --triple "$triple" --sdk "$(xcrun --sdk "$sdk" --show-sdk-path)" --target FactoriOSRuntime
-done
-"""
+depends = ["sdl3"]
+run = [
+  "swift build --product factorios-convert",
+  'swift build --target FactoriOSRuntime --triple arm64-apple-ios17.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"',
+  'swift build --target FactoriOSRuntime --triple arm64-apple-ios17.0-simulator --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"',
+]
 
 [tasks.format]
 description = "Format Swift sources"
 run = "swift format format --in-place --recursive --parallel Package.swift Sources"
-
-[tasks.xcode-project]
-description = "Build SDL3 if needed and generate xtool/FactoriOS.xcworkspace"
-run = ["scripts/prepare-sdl3.sh", "xtool dev generate-xcode-project"]

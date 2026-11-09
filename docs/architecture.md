@@ -20,8 +20,6 @@ flowchart TB
 | `FactoriOSCompat` | `FOSReplacements.m`, `FOSMetalFixes.m`, `FOSTextureCompression.m`, `FOSSDL.m`, `FOSWindowFrame.m` |
 | `FactoriOSConvert` | `main.swift`, `GameConverter`, `LoadCommandRewriter`, `BindStreamWalker`, `FatBinary` |
 
-`FACTORIOS_CORE_ONLY=1` hides the iOS targets so `factorios-convert` builds for the Mac.
-
 ## Preparing the game on the Mac
 
 ```mermaid
@@ -33,7 +31,7 @@ flowchart LR
     dylib -->|codesign with the app's certificate| signed[signed dylib]
 ```
 
-[`scripts/deploy`](../scripts/deploy) does every step: macOS mounts the disk image, `factorios-convert` converts, and
+[`deploy`](../mise-tasks/deploy) does every step: macOS mounts the disk image, `factorios-convert` converts, and
 `codesign` signs.
 
 The converter's changes to the arm64 slice:
@@ -49,7 +47,7 @@ The converter's changes to the arm64 slice:
 | Old signature removed, slots recorded | re-signed on the Mac; slots are patched after `dlopen` |
 
 Shaders ship as Metal source, which iOS compiles at run time. iOS loads code only from inside the app bundle, so the
-signed library is embedded in the app ([`scripts/deploy`](../scripts/deploy)) and the game data goes to the app's
+signed library is embedded in the app ([`deploy`](../mise-tasks/deploy)) and the game data goes to the app's
 `Library/Application Support/FactoriOS/Game`.
 
 ## Launch
@@ -74,7 +72,7 @@ sequenceDiagram
 
 - **SDL hand-over:** the game links SDL3 statically with the dynamic API left on. `SDL3_DYNAMIC_API` points it at
   FactoriOS's SDL3, so window, `CAMetalLayer`, touch, audio and controllers use SDL's UIKit backend. SDL's official iOS
-  build compiles the dynamic API out, so `scripts/prepare-sdl3.sh` builds it from source with the switch on.
+  build compiles the dynamic API out, so [`sdl3`](../mise-tasks/sdl3) builds it from the `External/SDL` submodule with the switch on.
 - **One run per process:** the game's static state can't be reset, so the app exits when the game ends. An `execv`
   restart request becomes a "reopen FactoriOS" prompt.
 - **Load-time safety:** `dlopen` runs 449 static initializers before the slots are filled. None of them reaches a
@@ -86,7 +84,7 @@ sequenceDiagram
 ## Compatibility map
 
 Every Mac API the game's own code reaches, and its iOS replacement. Symbol rows fill the slots the converter recorded.
-Metal rows patch the live Metal classes. `mise run lint` verifies each row against `Sources/FactoriOSCompat`.
+Metal rows patch the live Metal classes.
 
 | Mac API | Member | FactoriOS | iOS backing |
 |---|---|---|---|

@@ -46,7 +46,7 @@ public struct GamePaths: Sendable, Equatable {
     public var gameData: URL { gameApp.appendingPathComponent("Contents/data", isDirectory: true) }
     /// The game's original macOS executable.
     public var gameExecutable: URL { gameApp.appendingPathComponent("Contents/MacOS/factorio") }
-    /// Facts about the imported game, written by `scripts/deploy`.
+    /// Facts about the imported game, written by `deploy`.
     public var gameInfo: URL { support.appendingPathComponent("Game/game.json") }
 
     /// The converted, signed game library that FactoriOS loads from the app bundle.

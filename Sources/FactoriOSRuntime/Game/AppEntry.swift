@@ -47,7 +47,7 @@ enum AppEntry {
             RuntimeLog.write("Can't create FactoriOS's folders in the app container", paths: nil)
             exit(EXIT_FAILURE)
         }
-        // The game a device build embedded in the app bundle, with the facts scripts/deploy recorded about it.
+        // The game a device build embedded in the app bundle, with the facts `deploy` recorded about it.
         let game = GameLibrary.isBundled(paths: paths) ? ImportedGame.installed(paths: paths) : nil
         let coordinator = LaunchCoordinator()
         let window = UIWindow(windowScene: RuntimeWindows.windowScene)

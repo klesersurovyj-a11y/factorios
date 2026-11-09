@@ -5,7 +5,7 @@
 /xtool/
 /Vendor/
 
-# Per-machine configuration, written by `mise run setup`
+# Per-machine overrides: FACTORIOS_DEVICE_ID, FACTORIOS_TEAM_ID, FACTORIOS_DMG, FACTORIOS_BUNDLE_ID
 mise.local.toml
 
 # Factorio disk images, the prepared game and DerivedData: never commit the game

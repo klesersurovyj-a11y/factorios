@@ -1,18 +1,83 @@
 #!/bin/sh
-# Builds and signs the app for the configured iPhone or iPad, prepares the game on this Mac with the same signing
+#MISE description="Build, install and launch FactoriOS with the game on your device"
+#MISE depends=["sdl3"]
+# Builds and signs the app for the connected iPhone or iPad, prepares the game on this Mac with the same signing
 # identity, embeds the game library in the app, installs the app and the game data, and launches it.
 # iOS only loads code from inside the app bundle, so the library has to travel in it.
+#
+# The device, team and disk image are detected; set FACTORIOS_DEVICE_ID, FACTORIOS_TEAM_ID, FACTORIOS_DMG or
+# FACTORIOS_BUNDLE_ID (in the environment or mise.local.toml) to choose one yourself.
 set -eu
 
-missing="is not set; run 'mise run setup'"
-device=${FACTORIOS_DEVICE_ID:?$missing}
-team=${FACTORIOS_TEAM_ID:?$missing}
-bundle_id=${FACTORIOS_BUNDLE_ID:?$missing}
-dmg=${FACTORIOS_DMG:?$missing}
-derived_data=${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}
+fail() {
+    echo "deploy: $1" >&2
+    exit 1
+}
+
+# pick KIND VARIABLE HINT, with "value<TAB>label" candidates on stdin: prints the only candidate.
+pick() {
+    candidates=$(cat)
+    if [ -z "$candidates" ]; then
+        fail "no $1 found: $3"
+    elif [ "$(printf '%s\n' "$candidates" | wc -l)" -ne 1 ]; then
+        fail "several $1s found; choose one with \`mise set --file mise.local.toml $2=...\`:
+$(printf '%s\n' "$candidates" | awk -F '\t' '{ print "  " $1 "  " $2 }')"
+    fi
+    printf '%s\n' "$candidates" | cut -f 1
+}
+
+devices() {
+    json=$(mktemp)
+    xcrun devicectl list devices --quiet --json-output "$json" >/dev/null
+    jq -r '.result.devices[]
+        | .hardwareProperties as $h | .deviceProperties as $d
+        | select($h.reality == "physical" and $h.platform == "iOS")
+        | [$h.udid, "\($d.name) (\($h.marketingName))"
+            + (if $d.developerModeStatus == "enabled" then "" else ", Developer Mode off" end)]
+        | @tsv' "$json"
+    rm -f "$json"
+}
+
+teams() {
+    defaults export com.apple.dt.Xcode - |
+        plutil -extract IDEProvisioningTeamByIdentifier json -o - - 2>/dev/null |
+        jq -r '.[][] | [.teamID, "\(.teamName) (\(.teamType))"] | @tsv' | sort -u
+}
+
+# The newest download is the one to use; older ones are left over from earlier versions.
+newest_dmg() {
+    newest=''
+    for image in artifact/factorio*mac*.dmg "$HOME"/Downloads/factorio*mac*.dmg; do
+        if [ -f "$image" ] && { [ -z "$newest" ] || [ "$image" -nt "$newest" ]; }; then
+            newest=$image
+        fi
+    done
+    [ -z "$newest" ] || printf '%s\tnewest download\n' "$newest"
+}
+
+case $(xcode-select --print-path 2>/dev/null) in
+    *CommandLineTools* | '') fail "select Xcode: \`sudo xcode-select -s /Applications/Xcode.app\`" ;;
+esac
+
+device=${FACTORIOS_DEVICE_ID:-$(devices | pick device FACTORIOS_DEVICE_ID \
+    "connect the iPhone or iPad with a cable, unlock it and trust this Mac")}
+team=${FACTORIOS_TEAM_ID:-$(teams | pick team FACTORIOS_TEAM_ID \
+    "add your Apple Account in Xcode > Settings > Accounts")}
+dmg=${FACTORIOS_DMG:-$(newest_dmg | pick "Factorio disk image" FACTORIOS_DMG \
+    "download Factorio for macOS from https://factorio.com/download to ~/Downloads")}
+[ -f "$dmg" ] || fail "$dmg does not exist"
+# A free team's App IDs are unique across Apple, so each team needs its own.
+bundle_id=${FACTORIOS_BUNDLE_ID:-app.factorios.$(echo "$team" | tr '[:upper:]' '[:lower:]')}
+case $bundle_id in
+    *[!A-Za-z0-9.-]*) fail "$bundle_id is not a valid bundle ID" ;;
+esac
+echo "Deploying to $device with team $team as $bundle_id"
+
+derived_data=artifact/DerivedData
 app="$derived_data/Build/Products/Debug-iphoneos/FactoriOS-App.app"
 game=artifact/game/FactoriOS
 
+xtool dev generate-xcode-project
 xcodebuild \
     -workspace xtool/FactoriOS.xcworkspace -scheme FactoriOS-App -configuration Debug \
     -destination "id=$device" -derivedDataPath "$derived_data" \
@@ -73,7 +138,7 @@ else
 fi
 
 echo "Converting Factorio $(plutil -extract version raw -o - "$game/Game/game.json")"
-FACTORIOS_CORE_ONLY=1 swift run -c release factorios-convert "$game"
+swift run -c release factorios-convert "$game"
 codesign --force --sign "$identity" --identifier factorio --timestamp=none "$game/Converted/factorio.dylib"
 
 mkdir -p "$app/Frameworks"

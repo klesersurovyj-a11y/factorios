@@ -1,5 +1,5 @@
 // Converts the imported game's macOS executable into the unsigned iOS library and slot manifest the device build
-// embeds. scripts/deploy imports the game before and signs the library after.
+// embeds. `deploy` imports the game before and signs the library after.
 //
 // Usage: factorios-convert <directory>, which holds Game/factorio.app; writes Converted/.
 

@@ -5,7 +5,7 @@ aren't supported yet.
 
 ```mermaid
 flowchart LR
-    A[1. Mac tools] --> B[2. Apple Account<br/>in Xcode] --> C[3. Prepare device] --> D[4. Download<br/>Factorio .dmg] --> E[5. mise run setup] --> F[6. mise run deploy] --> G[7. Trust developer<br/>on device]
+    A[1. Mac tools] --> B[2. Apple Account<br/>in Xcode] --> C[3. Prepare device] --> D[4. Download<br/>Factorio .dmg] --> E[5. mise run deploy] --> F[6. Trust developer<br/>on device]
 ```
 
 ## Requirements
@@ -24,7 +24,7 @@ flowchart LR
 ```sh
 xcode-select -p                 # should print /Applications/Xcode.app/Contents/Developer
 sudo xcode-select -s /Applications/Xcode.app   # if it printed CommandLineTools
-git clone https://github.com/kmnft/factorios.git && cd factorios
+git clone --recurse-submodules https://github.com/kmnft/factorios.git && cd factorios
 mise trust && mise install
 ```
 
@@ -44,37 +44,25 @@ the signing certificate and provisioning profile on the first build.
 ## 4. Download Factorio
 
 Download Factorio for macOS from [`factorio.com/download`](https://factorio.com/download) into `~/Downloads` (or into
-`artifact/` in the repository). `mise run setup` picks the newest `factorio*mac*.dmg` from either place.
+`artifact/` in the repository). `mise run deploy` picks the newest `factorio*mac*.dmg` from either place.
 
-## 5. Configure
-
-```sh
-mise run setup
-```
-
-`setup` checks Xcode and writes the values below to `mise.local.toml`, which stays on your Mac. When there are several
-candidates it lists them, and you choose with a flag: `mise run setup -- --device UDID --team TEAMID --dmg PATH`.
-
-| Variable | Detected from |
-|---|---|
-| `FACTORIOS_DEVICE_ID` | the connected device (`xcrun devicectl list devices`) |
-| `FACTORIOS_TEAM_ID` | the teams of the accounts signed in to Xcode |
-| `FACTORIOS_DMG` | the newest Factorio disk image |
-| `FACTORIOS_BUNDLE_ID` | `app.factorios.<team>`: a free team's App ID must be unique across Apple |
-
-## 6. Build and install
+## 5. Build and install
 
 ```sh
 mise run deploy
 ```
 
-The first run takes a while: it builds SDL3 from source, the app, and the Mac converter, imports the disk image and
-converts the game. Later runs reuse all of that and copy only changed game files.
+There is nothing to configure: `deploy` finds the connected device, your Xcode team and the newest `.dmg` itself. Only
+if it finds several and stops, pick one as it tells you, for example
+`mise set --file mise.local.toml FACTORIOS_DEVICE_ID=UDID`. That file stays on your Mac.
+
+The first run takes a while: it builds SDL3 from the `External/SDL` submodule, the app, and the Mac converter,
+imports the disk image and converts the game. Later runs reuse all of that and copy only changed game files.
 
 ```mermaid
 sequenceDiagram
     participant X as Xcode
-    participant P as scripts/deploy
+    participant P as deploy
     participant D as Device
     X->>X: build and sign FactoriOS (automatic signing)
     P->>P: mount .dmg, copy factorio.app, factorios-convert to factorio.dylib
@@ -85,7 +73,7 @@ sequenceDiagram
     X->>D: launch
 ```
 
-## 7. First launch
+## 6. First launch
 
 iOS blocks apps from a new developer until you trust it: **Settings → General → VPN & Device Management**, select your
 Apple Account, tap **Trust**, and open FactoriOS. The launcher opens on its home screen. Tap **Main menu** to start
@@ -95,7 +83,7 @@ Factorio. [Playing](playing.md) covers the controls.
 
 - **Free accounts:** the provisioning profile expires after 7 days, and the app then stops launching. Run
   `mise run deploy` again; your saves stay. A free account allows 3 devices and 3 sideloaded apps per device.
-- **New Factorio version:** download the new `.dmg`, run `mise run setup` (it picks the newest image when the
-  configured one is gone, or pass `--dmg`), then `mise run deploy`.
+- **New Factorio version:** download the new `.dmg`, run `mise run deploy`; it picks the newest image unless
+  `FACTORIOS_DMG` is set.
 
 Something failed? See [Troubleshooting](troubleshooting.md).

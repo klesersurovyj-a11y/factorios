@@ -1,10 +1,12 @@
 #!/bin/sh
+#MISE description="Launch the launcher in the iOS Simulator"
+#MISE depends=["sdl3"]
 # Builds the app for the iOS Simulator, installs it and launches it. The game itself is device code, so the simulator
 # only shows the launcher's welcome screen: useful for UI work, not proof that the game runs.
 # Uses $FACTORIOS_SIMULATOR_ID, else a booted simulator, else boots the one Simulator.app last used.
 set -eu
 
-derived_data=${FACTORIOS_DERIVED_DATA:-artifact/DerivedData}
+derived_data=artifact/DerivedData
 bundle_id=${FACTORIOS_BUNDLE_ID:-app.factorios}
 
 booted() { xcrun simctl list devices booted | grep -Eo '[0-9A-F-]{36}' | head -n 1; }
@@ -22,6 +24,7 @@ fi
 xcrun simctl boot "$simulator" 2>/dev/null || true
 xcrun simctl bootstatus "$simulator" -b
 
+xtool dev generate-xcode-project
 xcodebuild \
     -workspace xtool/FactoriOS.xcworkspace -scheme FactoriOS-App -configuration Debug \
     -destination "platform=iOS Simulator,id=$simulator" -derivedDataPath "$derived_data" \

@@ -19,8 +19,8 @@ struct WelcomeView: View {
                 Text(
                     """
                     On a Mac with Xcode, download Factorio for macOS from factorio.com (the demo works too), then run \
-                    `mise run setup` and `mise run deploy` in the FactoriOS repository. They import and convert the \
-                    disk image, embed the signed game in the app, and install the app and the game data here.
+                    `mise run deploy` in the FactoriOS repository. It imports and converts the disk image, embeds the \
+                    signed game in the app, and installs the app and the game data here.
                     """
                 )
                 .font(.callout)

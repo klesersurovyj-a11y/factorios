@@ -1,7 +1,7 @@
 import FactoriOSCore
 import Foundation
 
-/// Facts about the imported game, which `scripts/deploy` saves next to it.
+/// Facts about the imported game, which `deploy` saves next to it.
 struct ImportedGame: Decodable, Sendable {
     /// The game's version, such as `2.1.23`.
     let version: String
