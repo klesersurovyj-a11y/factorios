@@ -1,3 +1,4 @@
+import FactoriOSCore
 import SwiftUI
 
 /// The display, game and controller settings, and the game's files.
