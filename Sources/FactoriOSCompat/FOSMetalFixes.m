@@ -302,23 +302,26 @@ static FOSNextDrawableIMP fosNextDrawable;
 /// Set while the cap's own presentation runs, in case Metal implements it through presentDrawable:.
 static _Thread_local BOOL fosPresentingCapped = NO;
 
+/// -[MTLCommandBuffer presentDrawable:afterMinimumDuration:], called through its implementation: the SDK marks it
+/// unavailable where Metal may lack it, so the cap asks the live object.
+typedef void (*FOSPresentAfterMinimumDurationIMP)(id, SEL, id, CFTimeInterval);
+
 /// -[MTLCommandBuffer presentDrawable:] with the frame-rate cap: each frame stays on screen at least 1/cap seconds.
 static void FOSPresentDrawable(id commandBuffer, SEL cmd, id drawable) {
     if (!fosPresentingCapped) {
         __atomic_add_fetch(&fosPresentedFrameCount, 1, __ATOMIC_RELAXED);
     }
     NSInteger cap = __atomic_load_n(&fosFrameRateCap, __ATOMIC_RELAXED);
-    if (cap <= 0 || fosPresentingCapped) {
+    SEL capped = sel_registerName("presentDrawable:afterMinimumDuration:");
+    if (cap <= 0 || fosPresentingCapped || ![commandBuffer respondsToSelector:capped]) {
+        // No cap, the cap's own presentation, or a Metal without minimum durations: presented as the game asked.
         fosPresentDrawable(commandBuffer, cmd, drawable);
         return;
     }
+    FOSPresentAfterMinimumDurationIMP present =
+        (FOSPresentAfterMinimumDurationIMP)class_getMethodImplementation(object_getClass(commandBuffer), capped);
     fosPresentingCapped = YES;
-#if TARGET_OS_SIMULATOR
-    // The simulator's MTLCommandBuffer protocol omits afterMinimumDuration; launcher testing doesn't need a GPU cap.
-    fosPresentDrawable(commandBuffer, cmd, drawable);
-#else
-    [(id<MTLCommandBuffer>)commandBuffer presentDrawable:drawable afterMinimumDuration:1.0 / (CFTimeInterval)cap];
-#endif
+    present(commandBuffer, capped, drawable, 1.0 / (CFTimeInterval)cap);
     fosPresentingCapped = NO;
 }
 
@@ -327,6 +330,23 @@ static void FOSPresentDrawable(id commandBuffer, SEL cmd, id drawable) {
 static void *FOSNextDrawable(id layer, SEL cmd) {
     FOSWaitForForeground();
     return fosNextDrawable(layer, cmd);
+}
+
+#pragma mark - GPU family
+
+/// The oldest family the game accepts besides MTLGPUFamilyMac2; it won't create a device that supports neither.
+static const NSInteger FOSGameMinimumFamily = MTLGPUFamilyApple7;
+
+typedef BOOL (*FOSSupportsFamilyIMP)(id, SEL, MTLGPUFamily);
+static FOSSupportsFamilyIMP fosSupportsFamily;
+
+/// -[MTLDevice supportsFamily:], also YES for the game's minimum family. The game otherwise falls back to OpenGL, which
+/// iOS lacks, on a GPU that reports an older family (the iOS Simulator's reports only MTLGPUFamilyApple2).
+static BOOL FOSDeviceSupportsFamily(id device, SEL cmd, MTLGPUFamily family) {
+    if (family == FOSGameMinimumFamily) {
+        return YES;
+    }
+    return fosSupportsFamily(device, cmd, family);
 }
 
 #pragma mark - Installation
@@ -412,6 +432,11 @@ static void FOSInstallPresentationFixes(const FOSMetalClasses *classes) {
                                                      (IMP)FOSNextDrawable);
 }
 
+static void FOSInstallFamilyFix(const FOSMetalClasses *classes) {
+    fosSupportsFamily = (FOSSupportsFamilyIMP)FOSSwizzle(classes->device, sel_registerName("supportsFamily:"),
+                                                         (IMP)FOSDeviceSupportsFamily);
+}
+
 void FOSCompatInstallMetalFixes(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -425,6 +450,7 @@ void FOSCompatInstallMetalFixes(void) {
         FOSInstallBCEmulation(&classes);
         FOSInstallMissingMethods(&classes);
         FOSInstallPresentationFixes(&classes);
+        FOSInstallFamilyFix(&classes);
     });
 }
 

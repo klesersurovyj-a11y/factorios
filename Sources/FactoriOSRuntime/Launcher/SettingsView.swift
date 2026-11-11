@@ -99,7 +99,7 @@ struct SettingsView: View {
             Text(
                 """
                 Move, resize, remove and add the on-screen buttons. In a game, the toolbar at the top does the \
-                same. The buttons step aside while a controller is connected.
+                same, and hides or shows the buttons.
                 """
             )
         }

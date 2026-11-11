@@ -9,7 +9,8 @@ Start with [Getting started](getting-started.md). Then read [Architecture](archi
 | Task | Does |
 |---|---|
 | `mise run deploy` | Builds, prepares the game, installs and launches on the device ([`deploy`](../mise-tasks/deploy)) |
-| `mise run simulator` | Builds and launches the launcher in the iOS Simulator; the game itself only runs on a device |
+| `mise run simulator:build` | The same in the iOS Simulator on an Apple silicon Mac, ad-hoc signed ([`simulator/build`](../mise-tasks/simulator/build)) |
+| `mise run simulator:launch` | Launches the installed app in the simulator again, without building ([`simulator/launch`](../mise-tasks/simulator/launch)) |
 | `mise run lint` | SwiftLint, swift-format, clang-tidy, scripts, property lists |
 | `mise run build` | `factorios-convert`, and the iOS device and simulator compile |
 | `mise run format` | Rewrites Swift sources with swift-format |
@@ -23,9 +24,9 @@ Everything runs on macOS with Xcode. Run `lint` and `build` before you open a pu
 |---|---|
 | `Sources/` | The Swift package's modules ([Architecture](architecture.md#modules)) |
 | `Resources/` | `Info.plist`, entitlements, app icon |
-| `mise-tasks/` | Shell scripts mise runs as tasks: `deploy`, `simulator`, `sdl3` |
+| `mise-tasks/` | Shell scripts mise runs as tasks: `deploy`, `simulator/build`, `simulator/launch`, `prepare` (`deploy` and `simulator:build` run it), `sdl3` |
 | `External/SDL` | The SDL submodule, which `sdl3` builds with the dynamic API on |
-| `xtool.yml` | xtool's app description; `deploy` and `simulator` turn the package into an Xcode project |
+| `xtool.yml` | xtool's app description; `deploy` and `simulator:build` turn the package into an Xcode project |
 | `artifact/` | Ignored: DerivedData, the prepared game, local disk images |
 | `Vendor/`, `xtool/` | Ignored: the built SDL3 framework and the generated workspace |
 
@@ -33,7 +34,7 @@ Everything runs on macOS with Xcode. Run `lint` and `build` before you open a pu
 
 Run `mise run sdl3`, then `mise x -- xtool dev generate-xcode-project`, and open `xtool/FactoriOS.xcworkspace`. The
 workspace is generated and ignored, so make changes in `Package.swift`, `xtool.yml` or `Resources/`, then regenerate it. An app run from Xcode lacks the embedded
-game library, so the launcher shows its welcome screen. Use `mise run deploy` to play.
+game library, so the launcher shows its welcome screen. Use `mise run deploy` or `mise run simulator:build` to play.
 
 ## Conventions
 
@@ -42,6 +43,20 @@ game library, so the launcher shows its welcome screen. Use `mise run deploy` to
   `FactoriOSRuntime`'s folders.
 - A Mac API replacement goes into `Sources/FactoriOSCompat`, `GameLibrary.redirectedSymbols` when it fills a slot, and
   a row of the [compatibility map](architecture.md#compatibility-map).
+
+## Simulator
+
+`mise run simulator:build` boots `$FACTORIOS_SIMULATOR_ID`, a booted simulator, or the one the simulator app last used,
+and `mise run simulator:launch` starts the installed app again. Both bring up the simulator window: Device Hub since
+Xcode 27, Simulator.app before. Tap **Main menu**; the Mac's mouse is a finger, and its keyboard reaches the game while
+the simulator window forwards keystrokes. Logs are in the app container:
+
+```sh
+open "$(xcrun simctl get_app_container booted $BUNDLE data)/Library/Application Support/FactoriOS/Logs"
+```
+
+The game runs unchanged there: the same app, compatibility layer and game data, with the library tagged for the
+simulator and signed ad hoc. It renders with the Mac's GPU, so performance and memory don't predict a device.
 
 ## On-device debugging
 

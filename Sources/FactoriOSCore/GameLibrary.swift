@@ -19,6 +19,7 @@ public enum GameLibrary {
         "_MTLCopyAllDevices",
         "_MTLCopyAllDevicesWithObserver",
         "_MTLRemoveDeviceObserver",
+        "_SecCertificateCopyLongDescription",
         "_execv",
         "_fork",
         "__NSGetExecutablePath",

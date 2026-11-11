@@ -28,17 +28,17 @@ flowchart LR
     app -->|arm64 slice| conv[GameConverter]
     conv --> dylib[factorio.dylib]
     conv --> slots[slots.json<br/>pointer slots of replaced symbols]
-    dylib -->|codesign with the app's certificate| signed[signed dylib]
+    dylib -->|codesign: the app's certificate, or ad hoc for the simulator| signed[signed dylib]
 ```
 
-[`deploy`](../mise-tasks/deploy) does every step: macOS mounts the disk image, `factorios-convert` converts, and
-`codesign` signs.
+[`prepare`](../mise-tasks/prepare) mounts the disk image and runs `factorios-convert device|simulator`; then
+[`deploy`](../mise-tasks/deploy) or [`simulator:build`](../mise-tasks/simulator/build) signs.
 
 The converter's changes to the arm64 slice:
 
 | Change | Why |
 |---|---|
-| Platform retagged to iOS (`LC_BUILD_VERSION`) | dyld refuses macOS binaries in an iOS process |
+| Platform retagged to iOS or iOS Simulator (`LC_BUILD_VERSION`) | dyld refuses an image of another platform |
 | `MH_EXECUTE` → `MH_DYLIB`, `LC_ID_DYLIB` added, `LC_LOAD_DYLINKER` dropped | so it can be `dlopen`ed |
 | 4 GB `__PAGEZERO` shrunk to one page | a running process can't map it; LiveContainer does the same |
 | Framework paths flattened (`Versions/A/` removed) | iOS frameworks are flat |
@@ -47,7 +47,7 @@ The converter's changes to the arm64 slice:
 | Old signature removed, slots recorded | re-signed on the Mac; slots are patched after `dlopen` |
 
 Shaders ship as Metal source, which iOS compiles at run time. iOS loads code only from inside the app bundle, so the
-signed library is embedded in the app ([`deploy`](../mise-tasks/deploy)) and the game data goes to the app's
+signed library is embedded in the app (`deploy`, `simulator:build`) and the game data goes to the app's
 `Library/Application Support/FactoriOS/Game`.
 
 ## Launch
@@ -112,6 +112,7 @@ Metal rows patch the live Metal classes.
 | `_MTLCopyAllDevices` | `fos_MTLCopyAllDevices` | `fos_MTLCopyAllDevices` | `MTLCreateSystemDefaultDevice` in an array |
 | `_MTLCopyAllDevicesWithObserver` | `fos_MTLCopyAllDevicesWithObserver` | `fos_MTLCopyAllDevicesWithObserver` | the same; the one GPU never changes |
 | `_MTLRemoveDeviceObserver` | `fos_MTLRemoveDeviceObserver` | `fos_MTLRemoveDeviceObserver` | nothing was registered |
+| `_SecCertificateCopyLongDescription` | `fos_SecCertificateCopyLongDescription` | `fos_SecCertificateCopyLongDescription` | `SecCertificateCopySubjectSummary`: libcurl's TLS check calls it unchecked |
 | `_execv` | `fos_execv` | `fos_execv` | restart request: asks the player to reopen FactoriOS |
 | `_fork` | `fos_fork` | `fos_fork` | `ENOSYS`: iOS forbids it |
 | `__NSGetExecutablePath` | `fos_NSGetExecutablePath` | `fos_NSGetExecutablePath` | the imported game's executable path |
@@ -129,8 +130,9 @@ Metal rows patch the live Metal classes.
 | `MTLBlitCommandEncoder` | `copyFromBuffer:…toTexture:…destinationOrigin:` | `FOSCopyBufferToTexture` | without BC: `FOSBCDecode` on the CPU, then the decoded copy |
 | `CAMetalLayer` | `setDisplaySyncEnabled:` | `FOSLayerSetDisplaySyncEnabled` | stored; iOS always syncs |
 | `CAMetalLayer` | `displaySyncEnabled` | `FOSLayerDisplaySyncEnabled` | the stored value |
-| `MTLCommandBuffer` | `presentDrawable:` | `FOSPresentDrawable` | `presentDrawable:afterMinimumDuration:` for the FPS cap |
+| `MTLCommandBuffer` | `presentDrawable:` | `FOSPresentDrawable` | `presentDrawable:afterMinimumDuration:` for the FPS cap, where Metal has it |
 | `CAMetalLayer` | `nextDrawable` | `FOSNextDrawable` | waits while the app is in the background |
+| `MTLDevice` | `supportsFamily:` | `FOSDeviceSupportsFamily` | also YES for Apple7, the game's minimum, so a GPU that reports an older family (the simulator's: Apple2) still gets Metal |
 
 **BC textures:** iPhone GPUs report no BC texture compression, while Factorio's Metal renderer assumes it. The compat
 layer creates BC textures uncompressed and decodes uploads on the CPU (BC1-BC3 bit-exact, BC4/5 within 8-bit
@@ -155,3 +157,4 @@ a macOS binary for iOS.
 | On-screen controller, gestures, layout editor | Verified |
 | Physical controllers | Unverified |
 | Restart prompt (`execv`) | Unverified |
+| iOS Simulator (Apple silicon) | Verified to the main menu with Factorio 2.1.24 (iOS 27.2 simulator) |

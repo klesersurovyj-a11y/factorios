@@ -36,7 +36,7 @@ Bold marks the default.
 ## Controls
 
 FactoriOS puts Factorio in controller mode and draws a gamepad over the game. A connected keyboard and mouse switch
-the game to keyboard-and-mouse mode. A physical controller hides the on-screen pad.
+the game to keyboard-and-mouse mode. The pad is shown by default; the toolbar's hide and show buttons toggle it.
 
 | Gesture on the game | Does |
 |---|---|
