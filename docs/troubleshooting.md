@@ -1,22 +1,19 @@
 # Troubleshooting
 
-| Symptom | Cause and fix |
+| Symptom | Fix |
 |---|---|
-| `deploy: select Xcode` | Run `sudo xcode-select -s /Applications/Xcode.app` |
-| `deploy: no device found` | Connect with a cable, unlock the device, tap **Trust**. Check `xcrun devicectl list devices` |
+| `deploy: select Xcode` | `sudo xcode-select -s /Applications/Xcode.app` |
+| `deploy: no device found` | Connect by cable, unlock, tap **Trust**; check `xcrun devicectl list devices` |
 | `deploy: no team found` | Sign in under Xcode → Settings → Accounts |
-| `deploy: several …s found` | Choose one: `mise set --file mise.local.toml FACTORIOS_DEVICE_ID=UDID` (or `FACTORIOS_TEAM_ID`, `FACTORIOS_DMG`) |
-| xcodebuild: *Failed to register bundle identifier* | Another team owns that App ID. Set a different ID: `mise set --file mise.local.toml FACTORIOS_BUNDLE_ID=app.factorios.yourname` |
-| xcodebuild: *Developer Mode disabled* | Settings → Privacy & Security → Developer Mode, then restart the device |
-| xcodebuild: *maximum number of apps* | A free team allows 3 sideloaded apps per device. Delete one |
-| App icon appears, launch says *Untrusted Developer* | Settings → General → VPN & Device Management → your account → Trust |
-| App stopped opening after a week | The free provisioning profile expired. Run `mise run deploy` |
-| Welcome screen instead of the home screen | The game data didn't reach the device. Run `mise run deploy` again and check the `devicectl device copy` step |
-| Game closes while loading | Out of memory. Set Sprite quality to Medium. Light graphics also help |
-| `xtool/FactoriOS.xcworkspace` out of date after pulling | `mise run deploy` regenerates it. Run `mise x -- xtool dev generate-xcode-project` to regenerate it on its own |
+| `deploy: several …s found` | `mise set --file mise.local.toml FACTORIOS_DEVICE_ID=…` (or `FACTORIOS_TEAM_ID`, `FACTORIOS_DMG`) |
+| *Failed to register bundle identifier* | `mise set --file mise.local.toml FACTORIOS_BUNDLE_ID=app.factorios.yourname` |
+| *Developer Mode disabled* | Settings → Privacy & Security → Developer Mode, restart |
+| *maximum number of apps* | A free team allows 3 sideloaded apps per device; delete one |
+| *Untrusted Developer* | Settings → General → VPN & Device Management → your account → Trust |
+| App stopped opening after a week | Free profile expired: `mise run deploy` |
+| Welcome screen instead of home | Game data missing: run `deploy` (or `simulator:build`) again |
+| Game closes while loading | Out of memory: Sprite quality Medium, Light graphics on |
+| No simulator window | `mise run simulator:launch` opens Device Hub (Simulator.app before Xcode 27) |
 
-## Collecting logs
-
-The launcher's **Logs** screen copies both logs. From the Mac, see
-[on-device debugging](development.md#on-device-debugging). Attach FactoriOS's log, the game's log, and
-`factorio-current.log` to bug reports, with the device model, iOS version and Factorio version.
+For bug reports, attach FactoriOS's log, the game's log and `factorio-current.log` (the launcher's **Logs** copies
+them, or see [debugging](development.md#debugging)), with device, iOS and Factorio versions.
