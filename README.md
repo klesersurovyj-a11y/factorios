@@ -5,10 +5,8 @@ you download from `factorio.com`, converts it into a library iOS can load, signs
 identity, and runs it with SDL3 for iOS and a small compatibility layer standing in for the few Mac-only APIs the game
 uses. There is no emulation or streaming, and the repository contains no game files.
 
-![Factorio on an iPhone with FactoriOS's on-screen controller](docs/images/gameplay.jpg)
-
-**Status:** Factorio 2.1.24 runs on an iPhone 14 (A15, iOS 26) at native resolution and 60 FPS with Medium sprites.
-Physical controllers and the in-game restart prompt are not yet verified on a device.
+![Factorio on an iPhone](docs/images/screenshot1.png)
+![Factorio on an iPhone](docs/images/screenshot2.png)
 
 ## Quick start
 
@@ -33,17 +31,6 @@ mise run deploy    # builds, signs, installs and launches FactoriOS with the gam
 | [Development](docs/development.md) | Tasks, checks, CI, simulator, on-device debugging, new game versions |
 | [Architecture](docs/architecture.md) | Modules, the conversion pipeline, launch sequence and compatibility map |
 | [AGENTS.md](AGENTS.md) | Orientation for coding agents |
-
-## How it works
-
-```mermaid
-flowchart LR
-    dmg[Factorio .dmg] --> prepare[Mac: import, convert<br/>Mach-O to iOS dylib, codesign]
-    xcode[Xcode build<br/>FactoriOS app + SDL3] --> embed[Embed dylib, re-sign]
-    prepare --> embed
-    embed --> device[Install on device<br/>+ copy game data]
-    device --> run[dlopen, fill compat slots,<br/>run Factorio's main]
-```
 
 ## Legal
 
