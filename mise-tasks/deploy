@@ -1,0 +1,155 @@
+#!/bin/sh
+#MISE description="Build, install and launch FactoriOS with the game on your device"
+#MISE depends=["sdl3"]
+# Builds and signs the app for the connected iPhone or iPad, prepares the game on this Mac with the same signing
+# identity, embeds the game library in the app, installs the app and the game data, and launches it.
+# iOS only loads code from inside the app bundle, so the library has to travel in it.
+#
+# The device, team and disk image are detected; set FACTORIOS_DEVICE_ID, FACTORIOS_TEAM_ID, FACTORIOS_DMG or
+# FACTORIOS_BUNDLE_ID (in the environment or mise.local.toml) to choose one yourself.
+set -eu
+
+fail() {
+    echo "deploy: $1" >&2
+    exit 1
+}
+
+# pick KIND VARIABLE HINT, with "value<TAB>label" candidates on stdin: prints the only candidate.
+pick() {
+    candidates=$(cat)
+    if [ -z "$candidates" ]; then
+        fail "no $1 found: $3"
+    elif [ "$(printf '%s\n' "$candidates" | wc -l)" -ne 1 ]; then
+        fail "several $1s found; choose one with \`mise set --file mise.local.toml $2=...\`:
+$(printf '%s\n' "$candidates" | awk -F '\t' '{ print "  " $1 "  " $2 }')"
+    fi
+    printf '%s\n' "$candidates" | cut -f 1
+}
+
+devices() {
+    json=$(mktemp)
+    xcrun devicectl list devices --quiet --json-output "$json" >/dev/null
+    jq -r '.result.devices[]
+        | .hardwareProperties as $h | .deviceProperties as $d
+        | select($h.reality == "physical" and $h.platform == "iOS")
+        | [$h.udid, "\($d.name) (\($h.marketingName))"
+            + (if $d.developerModeStatus == "enabled" then "" else ", Developer Mode off" end)]
+        | @tsv' "$json"
+    rm -f "$json"
+}
+
+teams() {
+    defaults export com.apple.dt.Xcode - |
+        plutil -extract IDEProvisioningTeamByIdentifier json -o - - 2>/dev/null |
+        jq -r '.[][] | [.teamID, "\(.teamName) (\(.teamType))"] | @tsv' | sort -u
+}
+
+# The newest download is the one to use; older ones are left over from earlier versions.
+newest_dmg() {
+    newest=''
+    for image in artifact/factorio*mac*.dmg "$HOME"/Downloads/factorio*mac*.dmg; do
+        if [ -f "$image" ] && { [ -z "$newest" ] || [ "$image" -nt "$newest" ]; }; then
+            newest=$image
+        fi
+    done
+    [ -z "$newest" ] || printf '%s\tnewest download\n' "$newest"
+}
+
+case $(xcode-select --print-path 2>/dev/null) in
+    *CommandLineTools* | '') fail "select Xcode: \`sudo xcode-select -s /Applications/Xcode.app\`" ;;
+esac
+
+device=${FACTORIOS_DEVICE_ID:-$(devices | pick device FACTORIOS_DEVICE_ID \
+    "connect the iPhone or iPad with a cable, unlock it and trust this Mac")}
+team=${FACTORIOS_TEAM_ID:-$(teams | pick team FACTORIOS_TEAM_ID \
+    "add your Apple Account in Xcode > Settings > Accounts")}
+dmg=${FACTORIOS_DMG:-$(newest_dmg | pick "Factorio disk image" FACTORIOS_DMG \
+    "download Factorio for macOS from https://factorio.com/download to ~/Downloads")}
+[ -f "$dmg" ] || fail "$dmg does not exist"
+# A free team's App IDs are unique across Apple, so each team needs its own.
+bundle_id=${FACTORIOS_BUNDLE_ID:-app.factorios.$(echo "$team" | tr '[:upper:]' '[:lower:]')}
+case $bundle_id in
+    *[!A-Za-z0-9.-]*) fail "$bundle_id is not a valid bundle ID" ;;
+esac
+echo "Deploying to $device with team $team as $bundle_id"
+
+derived_data=artifact/DerivedData
+app="$derived_data/Build/Products/Debug-iphoneos/FactoriOS-App.app"
+game=artifact/game/FactoriOS
+
+xtool dev generate-xcode-project
+xcodebuild \
+    -workspace xtool/FactoriOS.xcworkspace -scheme FactoriOS-App -configuration Debug \
+    -destination "id=$device" -derivedDataPath "$derived_data" \
+    -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+    DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
+    build
+
+certificates=$(mktemp -d)
+volume=$(mktemp -d)
+staging="$game/Game/factorio.app.importing"
+cleanup() {
+    hdiutil detach -quiet -force "$volume" 2>/dev/null || true
+    rmdir "$volume" 2>/dev/null || true
+    rm -rf "$certificates" "$staging"
+}
+trap cleanup EXIT
+
+# The SHA-1 of the certificate Xcode signed the app with: codesign's name for that identity.
+codesign -d --extract-certificates="$certificates/cert" "$app" 2>/dev/null
+identity=$(shasum -a 1 "$certificates/cert0" | cut -d ' ' -f 1)
+
+# Imports factorio.app from the disk image, unless the same image was imported last time.
+source_stamp="$(cd -- "$(dirname -- "$dmg")" && pwd)/$(basename -- "$dmg") $(stat -f '%z %m' "$dmg")"
+if [ -f "$game/Game/game.json" ] && [ "$(cat "$game.source" 2>/dev/null)" = "$source_stamp" ]; then
+    echo "Using the game already imported from $(basename -- "$dmg")"
+else
+    echo "Importing $(basename -- "$dmg")"
+    hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$volume" "$dmg" >/dev/null
+    source_app=$(find "$volume" -mindepth 1 -maxdepth 2 -type d -iname factorio.app -print -quit)
+    if [ -z "$source_app" ]; then
+        echo "no factorio.app in $dmg" >&2
+        exit 1
+    fi
+    mkdir -p "$game/Game"
+    rm -rf "$staging"
+    rsync -a --exclude '*.dSYM' "$source_app/" "$staging/"
+    hdiutil detach -quiet "$volume"
+    contents="$staging/Contents"
+    if [ ! -f "$contents/MacOS/factorio" ]; then
+        echo "$(basename -- "$dmg") has no factorio.app/Contents/MacOS/factorio" >&2
+        exit 1
+    fi
+    version=$(plutil -extract version raw -o - "$contents/data/base/info.json")
+    case $version in
+    '' | *[!0-9A-Za-z.+-]*)
+        echo "unreadable game version in data/base/info.json: $version" >&2
+        exit 1
+        ;;
+    esac
+    is_demo=false
+    case $(plutil -extract CFBundleDisplayName raw -o - "$contents/Info.plist" 2>/dev/null || true) in
+    *Demo*) is_demo=true ;;
+    esac
+    rm -rf "$game/Game/game.json" "$game/Game/factorio.app"
+    mv "$staging" "$game/Game/factorio.app"
+    printf '{"isDemo":%s,"version":"%s"}\n' "$is_demo" "$version" >"$game/Game/game.json"
+    printf '%s\n' "$source_stamp" >"$game.source"
+fi
+
+echo "Converting Factorio $(plutil -extract version raw -o - "$game/Game/game.json")"
+swift run -c release factorios-convert "$game"
+codesign --force --sign "$identity" --identifier factorio --timestamp=none "$game/Converted/factorio.dylib"
+
+mkdir -p "$app/Frameworks"
+cp "$game/Converted/factorio.dylib" "$app/Frameworks/factorio.dylib"
+cp "$game/Converted/slots.json" "$app/Frameworks/factorio.slots.json"
+chmod 755 "$app/Frameworks/factorio.dylib"
+codesign --force --sign "$identity" --preserve-metadata=entitlements,requirements,flags,runtime "$app"
+codesign --verify --deep --strict "$app"
+
+xcrun devicectl device install app --device "$device" "$app"
+xcrun devicectl device copy to --device "$device" \
+    --domain-type appDataContainer --domain-identifier "$bundle_id" \
+    --source "$game/Game" --destination "Library/Application Support/FactoriOS/Game"
+xcrun devicectl device process launch --device "$device" --terminate-existing "$bundle_id"

@@ -16,10 +16,9 @@ You need a Mac with Xcode, an iPhone or iPad on iOS 17 or later, a free Apple Ac
 [demo](https://factorio.com/download) works).
 
 ```sh
-git clone https://github.com/kmnft/factorios.git && cd factorios
+git clone --recurse-submodules https://github.com/kmnft/factorios.git && cd factorios
 mise install       # pinned toolchain
-mise run setup     # finds your device, Apple team and Factorio .dmg; writes mise.local.toml
-mise run device    # builds, signs, installs and launches FactoriOS with the game
+mise run deploy    # builds, signs, installs and launches FactoriOS with the game
 ```
 
 [Getting started](docs/getting-started.md) walks through each step, including Xcode and device preparation.
@@ -55,8 +54,8 @@ flowchart LR
   non-commercial use and forbid distributing the game or altered versions of it, so never share the converted
   library, an app build that contains it, or the game data. The screenshot shows Factorio content, © Wube Software,
   for illustration.
-- **SDL3** (zlib License) is downloaded from [libsdl-org/SDL](https://github.com/libsdl-org/SDL) at build time, built
-  from source and embedded in the app; its license is in the SDL source tarball.
+- **SDL3** (zlib License) is the [libsdl-org/SDL](https://github.com/libsdl-org/SDL) submodule in `External/SDL`, built
+  from source and embedded in the app; its license is `External/SDL/LICENSE.txt`.
 - **LiveContainer** (AGPL-3.0) is cited as prior art for loading an executable as a library. FactoriOS uses none of its
   code.
 - **Apple, iPhone, iPad, Xcode and macOS** are trademarks of Apple Inc. FactoriOS installs through Apple's
