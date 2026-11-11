@@ -10,7 +10,7 @@ description = "Lint Swift, Objective-C, scripts and property lists"
 run = [
   "swiftlint lint --strict --quiet",
   "swift format lint --strict --recursive --parallel Package.swift Sources",
-  "shellcheck mise-tasks/*",
+  "find mise-tasks -type f -exec shellcheck {} +",
   "plutil -lint -s Resources/*.plist Resources/*.entitlements",
   'clang-tidy --quiet Sources/FactoriOSCompat/*.m -- --target=arm64-apple-ios17.0 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -resource-dir "$(xcrun clang -print-resource-dir)" -fobjc-arc -fmodules -ISources/FactoriOSCompat/include',
 ]

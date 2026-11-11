@@ -1,17 +1,20 @@
-// Converts the imported game's macOS executable into the unsigned iOS library and slot manifest the device build
-// embeds. `deploy` imports the game before and signs the library after.
+// Converts the imported game's macOS executable into the unsigned iOS library and slot manifest the app build
+// embeds. `prepare` imports the game before; `deploy` and `simulator:build` sign the library after.
 //
-// Usage: factorios-convert <directory>, which holds Game/factorio.app; writes Converted/.
+// Usage: factorios-convert device|simulator <directory>, which holds Game/factorio.app; writes Converted/.
 
 import FactoriOSCore
 import Foundation
 
-let arguments = CommandLine.arguments.dropFirst()
+let arguments = Array(CommandLine.arguments.dropFirst())
 
-guard arguments.count == 1, let directory = arguments.first else {
-    FileHandle.standardError.write(Data("usage: factorios-convert DIRECTORY\n".utf8))
+guard arguments.count == 2, let platform = TargetPlatform(rawValue: arguments[0]) else {
+    let platforms = TargetPlatform.allCases.map(\.rawValue).joined(separator: "|")
+    FileHandle.standardError.write(Data("usage: factorios-convert \(platforms) DIRECTORY\n".utf8))
     exit(EXIT_FAILURE)
 }
+
+let directory = arguments[1]
 
 let paths = GamePaths(
     support: URL(fileURLWithPath: directory, isDirectory: true),
@@ -22,7 +25,10 @@ do {
     // Mapped, not read: the executable is over 200 MB.
     let executable = try Data(contentsOf: paths.gameExecutable, options: .alwaysMapped)
     let converted = try GameConverter.convert(
-        executable: executable, installName: "@rpath/factorio.dylib", redirectedSymbols: GameLibrary.redirectedSymbols
+        executable: executable,
+        platform: platform,
+        installName: "@rpath/factorio.dylib",
+        redirectedSymbols: GameLibrary.redirectedSymbols
     )
     try converted.manifest.writeJSON(to: paths.slotManifest)
     try converted.data.write(to: paths.convertedLibrary, options: .atomic)

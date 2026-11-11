@@ -1,0 +1,75 @@
+#!/bin/sh
+#MISE description="Import the Factorio disk image and convert the game for a device or the simulator"
+#MISE hide=true
+# Usage: mise run prepare device|simulator. `deploy` and `simulator:build` run it, then sign the library.
+# Imports factorio.app from the newest Factorio disk image (or $FACTORIOS_DMG) into artifact/game/FactoriOS/Game, then
+# converts it into artifact/game/FactoriOS/Converted: an unsigned library and its slot manifest.
+set -eu
+
+fail() {
+    echo "prepare: $1" >&2
+    exit 1
+}
+
+case ${1:-} in
+    device | simulator) platform=$1 ;;
+    *) fail "usage: prepare device|simulator" ;;
+esac
+
+# The newest download is the one to use; older ones are left over from earlier versions.
+newest_dmg() {
+    newest=''
+    for image in artifact/factorio*mac*.dmg "$HOME"/Downloads/factorio*mac*.dmg; do
+        if [ -f "$image" ] && { [ -z "$newest" ] || [ "$image" -nt "$newest" ]; }; then
+            newest=$image
+        fi
+    done
+    printf '%s\n' "$newest"
+}
+
+dmg=${FACTORIOS_DMG:-$(newest_dmg)}
+[ -n "$dmg" ] || fail "no Factorio disk image found: download Factorio for macOS from https://factorio.com/download to \
+~/Downloads, or set FACTORIOS_DMG"
+[ -f "$dmg" ] || fail "$dmg does not exist"
+
+game=artifact/game/FactoriOS
+volume=$(mktemp -d)
+staging="$game/Game/factorio.app.importing"
+cleanup() {
+    hdiutil detach -quiet -force "$volume" 2>/dev/null || true
+    rmdir "$volume" 2>/dev/null || true
+    rm -rf "$staging"
+}
+trap cleanup EXIT
+
+# Imports factorio.app from the disk image, unless the same image was imported last time.
+source_stamp="$(cd -- "$(dirname -- "$dmg")" && pwd)/$(basename -- "$dmg") $(stat -f '%z %m' "$dmg")"
+if [ -f "$game/Game/game.json" ] && [ "$(cat "$game.source" 2>/dev/null)" = "$source_stamp" ]; then
+    echo "Using the game already imported from $(basename -- "$dmg")"
+else
+    echo "Importing $(basename -- "$dmg")"
+    hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$volume" "$dmg" >/dev/null
+    source_app=$(find "$volume" -mindepth 1 -maxdepth 2 -type d -iname factorio.app -print -quit)
+    [ -n "$source_app" ] || fail "no factorio.app in $dmg"
+    mkdir -p "$game/Game"
+    rm -rf "$staging"
+    rsync -a --exclude '*.dSYM' "$source_app/" "$staging/"
+    hdiutil detach -quiet "$volume"
+    contents="$staging/Contents"
+    [ -f "$contents/MacOS/factorio" ] || fail "$(basename -- "$dmg") has no factorio.app/Contents/MacOS/factorio"
+    version=$(plutil -extract version raw -o - "$contents/data/base/info.json")
+    case $version in
+        '' | *[!0-9A-Za-z.+-]*) fail "unreadable game version in data/base/info.json: $version" ;;
+    esac
+    is_demo=false
+    case $(plutil -extract CFBundleDisplayName raw -o - "$contents/Info.plist" 2>/dev/null || true) in
+        *Demo*) is_demo=true ;;
+    esac
+    rm -rf "$game/Game/game.json" "$game/Game/factorio.app"
+    mv "$staging" "$game/Game/factorio.app"
+    printf '{"isDemo":%s,"version":"%s"}\n' "$is_demo" "$version" >"$game/Game/game.json"
+    printf '%s\n' "$source_stamp" >"$game.source"
+fi
+
+echo "Converting Factorio $(plutil -extract version raw -o - "$game/Game/game.json") for the $platform"
+swift run -c release factorios-convert "$platform" "$game"

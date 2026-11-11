@@ -30,8 +30,6 @@ enum PadTool {
     static let playing: [Self] = [.edit, .fade, .hide, .keyboard]
     /// The tools while the controls are hidden.
     static let hidden: [Self] = [.show, .keyboard]
-    /// The tools while a physical controller is in use: it still needs the keyboard for typing names.
-    static let padInHand: [Self] = [.keyboard]
     /// The layout editor's tools.
     static let editing: [Self] = [.add, .remove, .smaller, .bigger, .fade, .reset, .done]
 

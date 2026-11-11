@@ -1,0 +1,52 @@
+#!/bin/sh
+#MISE description="Build, install and launch FactoriOS with the game in the iOS Simulator"
+#MISE depends=["sdl3"]
+# Builds the app for the iOS Simulator, prepares the game for it, embeds the ad-hoc signed game library in the app,
+# installs the app and the game data, and launches it. Needs an Apple silicon Mac: the game is arm64 only.
+# Uses $FACTORIOS_SIMULATOR_ID, else a booted simulator, else boots the one the simulator app last used.
+set -eu
+
+derived_data=artifact/DerivedData
+app="$derived_data/Build/Products/Debug-iphonesimulator/FactoriOS-App.app"
+game=artifact/game/FactoriOS
+bundle_id=${FACTORIOS_BUNDLE_ID:-app.factorios}
+
+booted() { xcrun simctl list devices booted | grep -Eo '[0-9A-F-]{36}' | head -n 1; }
+# Simulator windows: Device Hub since Xcode 27, Simulator.app before.
+show_simulator() { open -b com.apple.dt.Devices 2>/dev/null || open -a Simulator; }
+
+mise-tasks/prepare simulator
+
+simulator=${FACTORIOS_SIMULATOR_ID:-$(booted)}
+if [ -z "$simulator" ]; then
+    show_simulator
+    for _ in $(seq 60); do
+        simulator=$(booted)
+        [ -n "$simulator" ] && break
+        sleep 1
+    done
+fi
+[ -n "$simulator" ] || { echo 'no simulator booted; set FACTORIOS_SIMULATOR_ID (xcrun simctl list devices)' >&2; exit 1; }
+xcrun simctl boot "$simulator" 2>/dev/null || true
+xcrun simctl bootstatus "$simulator" -b
+
+xtool dev generate-xcode-project
+xcodebuild \
+    -workspace xtool/FactoriOS.xcworkspace -scheme FactoriOS-App -configuration Debug \
+    -destination "platform=iOS Simulator,id=$simulator" -derivedDataPath "$derived_data" \
+    CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
+    build
+
+# The simulator needs a signature on the library's code, not a certificate: an ad-hoc one does.
+codesign --force --sign - --identifier factorio "$game/Converted/factorio.dylib"
+mkdir -p "$app/Frameworks"
+cp "$game/Converted/factorio.dylib" "$app/Frameworks/factorio.dylib"
+cp "$game/Converted/slots.json" "$app/Frameworks/factorio.slots.json"
+chmod 755 "$app/Frameworks/factorio.dylib"
+
+xcrun simctl install "$simulator" "$app"
+container=$(xcrun simctl get_app_container "$simulator" "$bundle_id" data)
+mkdir -p "$container/Library/Application Support/FactoriOS/Game"
+rsync -a --delete "$game/Game/" "$container/Library/Application Support/FactoriOS/Game/"
+show_simulator
+xcrun simctl launch --terminate-running-process "$simulator" "$bundle_id"

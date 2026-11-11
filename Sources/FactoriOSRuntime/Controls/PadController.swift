@@ -135,7 +135,7 @@ final class PadController {
         release(control)
     }
 
-    /// Lets go of everything: the pad steps aside, the editor opens, or the game goes to the background.
+    /// Lets go of everything: the pad is hidden, the editor opens, or the game goes to the background.
     func releaseAll() {
         for control in states.keys {
             states[control]?.touches = []

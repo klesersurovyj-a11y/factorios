@@ -3,6 +3,7 @@
 
 @import Darwin;
 @import Metal;
+@import Security;
 
 #pragma mark - State set by the runtime
 
@@ -144,6 +145,20 @@ static void fos_MTLRemoveDeviceObserver(id<NSObject> observer) {
     (void)observer;
 }
 
+#pragma mark - Security
+
+/// SecCertificateCopyLongDescription (macOS only): the game's libcurl calls it, unchecked, for a server certificate's
+/// subject while it verifies a TLS connection. iOS's equivalent is the certificate's subject summary.
+static CFStringRef _Nullable fos_SecCertificateCopyLongDescription(CFAllocatorRef _Nullable allocator,
+                                                                   SecCertificateRef certificate,
+                                                                   CFErrorRef _Nullable *_Nullable error) {
+    CFStringRef summary = SecCertificateCopySubjectSummary(certificate);
+    if (summary == NULL && error != NULL) {
+        *error = CFErrorCreate(allocator, kCFErrorDomainOSStatus, errSecDecode, NULL);
+    }
+    return summary;
+}
+
 #pragma mark - Process control
 
 /// execv: iOS can't replace its process. The game calls this to restart itself (after mod changes, for example), so
@@ -201,10 +216,10 @@ static int fos_NSGetExecutablePath(char *buffer, uint32_t *bufferSize) {
 #pragma mark - The table
 
 const FOSSymbolReplacement *FOSCompatReplacements(size_t *count) {
-    static FOSSymbolReplacement table[16];
+    static FOSSymbolReplacement table[17];
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        FOSSymbolReplacement entries[16] = {
+        FOSSymbolReplacement entries[17] = {
             {"_NSApp", (const void *)&fosNSApp},
             {"_OBJC_CLASS_$_NSAppleEventManager", (__bridge const void *)[FOSAppleEventManager class]},
             {"_OBJC_CLASS_$_NSBitmapImageRep", (__bridge const void *)[FOSBitmapImageRep class]},
@@ -218,6 +233,7 @@ const FOSSymbolReplacement *FOSCompatReplacements(size_t *count) {
             {"_MTLCopyAllDevices", (const void *)fos_MTLCopyAllDevices},
             {"_MTLCopyAllDevicesWithObserver", (const void *)fos_MTLCopyAllDevicesWithObserver},
             {"_MTLRemoveDeviceObserver", (const void *)fos_MTLRemoveDeviceObserver},
+            {"_SecCertificateCopyLongDescription", (const void *)fos_SecCertificateCopyLongDescription},
             {"_execv", (const void *)fos_execv},
             {"_fork", (const void *)fos_fork},
             {"__NSGetExecutablePath", (const void *)fos_NSGetExecutablePath},

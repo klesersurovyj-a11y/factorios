@@ -14,6 +14,7 @@ enum MachO {
     static let flagPIE: UInt32 = 0x0020_0000
 
     static let platformIOS: UInt32 = 2
+    static let platformIOSSimulator: UInt32 = 7
     static let symbolFlagWeakImport: UInt8 = 0x1
 
     /// `LC_BUILD_VERSION` minimum OS, iOS 17.0, in the `xxxx.yy.zz` nibble encoding.

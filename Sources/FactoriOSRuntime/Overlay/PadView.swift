@@ -18,16 +18,6 @@ final class PadView: UIView {
         }
     }
 
-    /// The controls step aside: a physical controller is in use.
-    var stepsAside = false {
-        didSet {
-            if stepsAside {
-                controller.releaseAll()
-            }
-            setNeedsDisplay()
-        }
-    }
-
     /// A control went down or was selected, for a haptic.
     var onFeedback: (PadFeedback) -> Void = { _ in
         // Set by the overlay; without it the pad plays no haptics.
@@ -35,7 +25,7 @@ final class PadView: UIView {
 
     /// Whether the controls are drawn and take touches.
     private var controlsShown: Bool {
-        isEditing || (!stepsAside && !controller.layout.hidden)
+        isEditing || !controller.layout.hidden
     }
 
     init(input: (any GameInput)?, layout: PadLayout) {

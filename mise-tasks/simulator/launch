@@ -1,0 +1,13 @@
+#!/bin/sh
+#MISE description="Launch the FactoriOS that simulator:build installed, without building"
+# Restarts the app in $FACTORIOS_SIMULATOR_ID (booting it if needed), else in the booted simulator, and brings up the
+# simulator window: Device Hub since Xcode 27, Simulator.app before.
+set -eu
+
+simulator=${FACTORIOS_SIMULATOR_ID:-booted}
+if [ "$simulator" != booted ]; then
+    xcrun simctl boot "$simulator" 2>/dev/null || true
+    xcrun simctl bootstatus "$simulator" -b
+fi
+open -b com.apple.dt.Devices 2>/dev/null || open -a Simulator
+xcrun simctl launch --terminate-running-process "$simulator" "${FACTORIOS_BUNDLE_ID:-app.factorios}"

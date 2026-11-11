@@ -8,6 +8,7 @@ struct LoadCommandRewriter {
 
     let table: LoadCommandTable
     let libraries: [ConvertedLibrary]
+    let platform: TargetPlatform
     let installName: String
     let textVMAddress: UInt64
     let linkeditSize: LinkeditSize?
@@ -49,7 +50,7 @@ struct LoadCommandRewriter {
             guard bytes.count >= 24 else {
                 throw MachOError.malformed("LC_BUILD_VERSION is too short")
             }
-            bytes.storeLE(MachO.platformIOS, at: 8)
+            bytes.storeLE(platform.buildVersionPlatform, at: 8)
             bytes.storeLE(MachO.minimumIOS, at: 12)
             bytes.storeLE(MachO.iOSSDK, at: 16)
             return bytes

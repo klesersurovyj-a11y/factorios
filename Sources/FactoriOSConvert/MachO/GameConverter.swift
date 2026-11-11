@@ -6,12 +6,12 @@ enum GameConverter {
     /// Header bytes left free after the load commands: room for the signer's `LC_CODE_SIGNATURE`.
     static let signatureCommandRoom = 16
 
-    /// Converts the arm64 slice of `executable`: retags it for iOS, makes it an `MH_DYLIB` named `installName`
+    /// Converts the arm64 slice of `executable`: retags it for `platform`, makes it an `MH_DYLIB` named `installName`
     /// (`LC_ID_DYLIB`), flattens framework paths, weak-links the libraries iOS lacks or trims (and weak-imports their
     /// symbols), weak-imports every redirected symbol so a missing one doesn't stop `dlopen`, drops the old code
     /// signature and records the pointer slots of `redirectedSymbols` (Mach-O names, with the leading `_`).
     static func convert(
-        executable: Data, installName: String, redirectedSymbols: Set<String>
+        executable: Data, platform: TargetPlatform, installName: String, redirectedSymbols: Set<String>
     ) throws -> ConvertedImage {
         let slice = try FatBinary.arm64Slice(of: executable)
         let start = executable.startIndex
@@ -36,6 +36,7 @@ enum GameConverter {
         let rewriter = LoadCommandRewriter(
             table: table,
             libraries: libraries,
+            platform: platform,
             installName: installName,
             textVMAddress: text.vmAddress,
             linkeditSize: linkeditSize

@@ -1,5 +1,4 @@
 import FactoriOSCompat
-import GameController
 import UIKit
 
 /// The layer over the game: the on-screen controller, its toolbar and touch gestures on the game.
@@ -22,11 +21,6 @@ final class OverlayViewController: UIViewController {
     private var frameLink: CADisplayLink?
     private var sampleTime: CFTimeInterval = 0
     private var sampleFrames: UInt64 = 0
-
-    /// A physical controller is connected: the on-screen controls step aside.
-    private var padInHand = false {
-        didSet { refresh() }
-    }
 
     /// Creates the overlay.
     ///
@@ -88,8 +82,7 @@ final class OverlayViewController: UIViewController {
         padView.onFeedback = { [weak self] feedback in self?.playHaptic(feedback) }
         toolbar.onTool = { [weak self] tool in self?.use(tool) }
         toolbar.onAdd = { [weak self] control in self?.add(control) }
-        observeControllers()
-        controllersChanged()
+        observeLifecycle()
     }
 
     override func viewDidLayoutSubviews() {
@@ -151,12 +144,9 @@ final class OverlayViewController: UIViewController {
             // Nothing on screen yet; viewDidLoad shows the first state.
             return
         }
-        padView.stepsAside = padInHand && !padView.isEditing
         let tools: [PadTool]
         if padView.isEditing {
             tools = PadTool.editing
-        } else if padInHand {
-            tools = PadTool.padInHand
         } else if padView.controller.layout.hidden {
             tools = PadTool.hidden
         } else {
@@ -243,21 +233,15 @@ final class OverlayViewController: UIViewController {
         }
     }
 
-    /// The controls step aside while a physical controller is connected, and come back when it's gone; the
-    /// fingers let go of everything when the app leaves the screen.
-    private func observeControllers() {
+    /// The fingers let go of everything when the app leaves the screen.
+    private func observeLifecycle() {
         // Selector observers go away with the overlay by themselves.
-        let center = NotificationCenter.default
-        let changed = #selector(controllersChanged)
-        center.addObserver(self, selector: changed, name: .GCControllerDidConnect, object: nil)
-        center.addObserver(self, selector: changed, name: .GCControllerDidDisconnect, object: nil)
-        let resign = #selector(appWillResignActive)
-        center.addObserver(self, selector: resign, name: UIApplication.willResignActiveNotification, object: nil)
-    }
-
-    @objc
-    private func controllersChanged() {
-        padInHand = GCController.controllers().contains { $0.extendedGamepad != nil }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillResignActive),
+            name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
     }
 
     @objc
