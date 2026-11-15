@@ -36,7 +36,7 @@ jobs:
         env:
           FACTORIO_URL: ${{ secrets.FACTORIO_URL }}
         run: |
-          if [ "${{ inputs.use_demo }}" == "true" ]; then
+          if [ -z "$FACTORIO_URL" ]; then
             curl -L "https://factorio.com" -o factorio.dmg
           else
             curl -L "$FACTORIO_URL" -o factorio.dmg
@@ -44,6 +44,7 @@ jobs:
           hdiutil attach factorio.dmg -mountpoint /Volumes/Factorio
           cp -R /Volumes/Factorio/factorio.app ./factorio.app
           hdiutil detach /Volumes/Factorio
+
 
       - name: Check available tasks and build
         run: |
