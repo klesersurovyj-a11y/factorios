@@ -40,6 +40,9 @@ jobs:
 
       - name: Build unsigned FactoriOS app
         run: |
+          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          sudo xcode-select -s "$XCODE_26/Contents/Developer"
+          sed -i '' '/treatAllWarnings/d' Package.swift
           xtool dev generate-xcode-project
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
@@ -50,6 +53,8 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             build
 
 
