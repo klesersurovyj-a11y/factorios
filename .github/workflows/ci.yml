@@ -1,38 +1,64 @@
-name: CI
+name: Build FactoriOS IPA
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
   workflow_dispatch:
+    inputs:
+      use_demo:
+        description: 'Скачать бесплатную демоверсию вместо полной?'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  check:
-    name: Lint and build
-    # macOS: clang-tidy and the iOS build need Xcode.
+  build:
+    name: Build IPA
     runs-on: macos-15
     timeout-minutes: 45
+
     steps:
       - name: Check out source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@v4
         with:
+          submodules: recursive
           persist-credentials: false
 
       - name: Install pinned tools
-        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        uses: jdx/mise-action@v3
         with:
           cache: true
           install: true
 
-      - name: Lint
-        run: mise run lint
+      - name: Download Factorio for macOS
+        env:
+          FACTORIO_URL: ${{ secrets.FACTORIO_URL }}
+        run: |
+          if [ "${{ inputs.use_demo }}" == "true" ]; then
+            curl -L "https://factorio.com" -o factorio.dmg
+          else
+            curl -L "$FACTORIO_URL" -o factorio.dmg
+          fi
+          hdiutil attach factorio.dmg -mountpoint /Volumes/Factorio
+          cp -R /Volumes/Factorio/factorio.app ./factorio.app
+          hdiutil detach /Volumes/Factorio
 
-      - name: Build
-        run: mise run build
+      - name: Check available tasks and build
+        run: |
+          mise tasks
+          mise run build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          APP_PATH=$(find . -name "FactoriOS.app" -type d | head -n 1)
+          echo "Found app at: $APP_PATH"
+          cp -R "$APP_PATH" Payload/
+          zip -r FactoriOS-unsigned.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FactoriOS-IPA
+          path: FactoriOS-unsigned.ipa
+
