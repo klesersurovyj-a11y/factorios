@@ -40,8 +40,8 @@ jobs:
 
       - name: Build unsigned FactoriOS app
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer || true
-          mise exec -- xtool dev generate-xcode-project
+          sed -i '' 's/swift-tools-version: *6\.2/swift-tools-version: 6.1/g' Package.swift
+          xtool dev generate-xcode-project
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
             -scheme FactoriOS-App \
@@ -52,6 +52,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             build
+
 
 
       - name: Embed game and package IPA
