@@ -27,36 +27,47 @@ jobs:
           cache: true
           install: true
 
-      - name: Download Factorio Demo DMG
+      - name: Download Factorio DMG
         run: |
           mkdir -p artifact
-          curl -L -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" "https://factorio.com" -o artifact/factorio.dmg
-          ls -lh artifact/factorio.dmg
-          file artifact/factorio.dmg
+          curl -L "https://factorio.com/get-download/2.1.23/demo/osx" -o artifact/factorio_mac.dmg
+          file artifact/factorio_mac.dmg
 
-      - name: Check tasks and build
+      - name: Build SDL3 and prepare game
         run: |
-          mise tasks
-          mise run build
+          mise run sdl3
+          mise-tasks/prepare device
 
-      - name: Package IPA
+      - name: Build unsigned FactoriOS app
         run: |
+          xtool dev generate-xcode-project
+          xcodebuild \
+            -workspace xtool/FactoriOS.xcworkspace \
+            -scheme FactoriOS-App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath artifact/DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Embed game and package IPA
+        run: |
+          APP="artifact/DerivedData/Build/Products/Release-iphoneos/FactoriOS-App.app"
+          GAME="artifact/game/FactoriOS"
+          mkdir -p "$APP/Frameworks"
+          cp "$GAME/Converted/factorio.dylib" "$APP/Frameworks/factorio.dylib"
+          cp "$GAME/Converted/factorio.slots.json" "$APP/Frameworks/factorio.slots.json"
+          chmod 755 "$APP/Frameworks/factorio.dylib"
+          cp -R "$GAME/Game" "$APP/Game"
           mkdir -p Payload
-          find . -maxdepth 5 -not -path '*/.*' -o -path './.build*' -o -path './.xtool*' | grep -i "\.app$" || true
-          APP_PATH=$(find . -name "*.app" -type d | grep -iv "factorio.app" | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "No .app found, checking build outputs:"
-            find . -maxdepth 4 -type f -perm +111 | grep -iv "\.git"
-            exit 1
-          fi
-          echo "Found app at: $APP_PATH"
-          cp -R "$APP_PATH" Payload/
+          cp -R "$APP" Payload/
           zip -r FactoriOS-unsigned.ipa Payload
-
-
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FactoriOS-IPA
           path: FactoriOS-unsigned.ipa
+
