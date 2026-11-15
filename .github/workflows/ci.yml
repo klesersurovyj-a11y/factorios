@@ -42,14 +42,17 @@ jobs:
       - name: Package IPA
         run: |
           mkdir -p Payload
-          find . ~/Library/Developer/Xcode/DerivedData -name "*.app" -maxdepth 6
-          APP_PATH=$(find . ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d | grep -iv "factorio.app" | head -n 1)
+          find . -maxdepth 5 -not -path '*/.*' -o -path './.build*' -o -path './.xtool*' | grep -i "\.app$" || true
+          APP_PATH=$(find . -name "*.app" -type d | grep -iv "factorio.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find . -path "*build*" -name "*.app" -type d | head -n 1)
+            echo "No .app found, checking build outputs:"
+            find . -maxdepth 4 -type f -perm +111 | grep -iv "\.git"
+            exit 1
           fi
           echo "Found app at: $APP_PATH"
           cp -R "$APP_PATH" Payload/
           zip -r FactoriOS-unsigned.ipa Payload
+
 
 
       - name: Upload IPA Artifact
