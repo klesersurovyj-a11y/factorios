@@ -4,11 +4,6 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
-    inputs:
-      use_demo:
-        description: 'Скачать бесплатную демоверсию вместо полной?'
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -32,26 +27,19 @@ jobs:
           cache: true
           install: true
 
-      - name: Download Factorio for macOS
-        env:
-          FACTORIO_URL: ${{ secrets.FACTORIO_URL }}
+      - name: Download Factorio Demo DMG
         run: |
-          if [ -z "$FACTORIO_URL" ]; then
-            curl -L "https://factorio.com" -o factorio.dmg
-          else
-            curl -L "$FACTORIO_URL" -o factorio.dmg
-          fi
-          hdiutil attach factorio.dmg -mountpoint /Volumes/Factorio
-          cp -R /Volumes/Factorio/factorio.app ./factorio.app
-          hdiutil detach /Volumes/Factorio
+          mkdir -p artifact
+          curl -L -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" "https://factorio.com" -o artifact/factorio.dmg
+          ls -lh artifact/factorio.dmg
+          file artifact/factorio.dmg
 
-
-      - name: Check available tasks and build
+      - name: Check tasks and build
         run: |
           mise tasks
           mise run build
 
-      - name: Package unsigned IPA
+      - name: Package IPA
         run: |
           mkdir -p Payload
           APP_PATH=$(find . -name "FactoriOS.app" -type d | head -n 1)
@@ -64,4 +52,3 @@ jobs:
         with:
           name: FactoriOS-IPA
           path: FactoriOS-unsigned.ipa
-
