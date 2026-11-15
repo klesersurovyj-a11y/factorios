@@ -40,7 +40,14 @@ jobs:
 
       - name: Build unsigned FactoriOS app
         run: |
-          sed -i '' 's/swift-tools-version: *6\.2/swift-tools-version: 6.1/g' Package.swift
+          if [ -d "/Applications/Xcode_26.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_26.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+          else
+            sed -i '' 's/swift-tools-version: *6\.2/swift-tools-version: 6.1/g' Package.swift
+            sed -i '' '/treatAllWarnings/d' Package.swift
+          fi
           xtool dev generate-xcode-project
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
@@ -52,6 +59,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             build
+
 
 
 
