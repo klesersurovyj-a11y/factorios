@@ -118,9 +118,7 @@ final class GameSession {
         FOSCompatSetFrameRateCap(settings.frameRate.rawValue)
         let logPaths = paths
         FOSCompatSetRestartHandler { arguments in
-            MainActor.assumeIsolated {
-                RestartPrompt.show(arguments: arguments, paths: logPaths)
-            }
+            RestartPrompt.show(arguments: arguments, paths: logPaths)
         }
     }
 
