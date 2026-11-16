@@ -42,23 +42,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Выбираем самый новый Xcode 26
           XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
-          if [ -z "$XCODE_26" ]; then
-            echo "Xcode 26 not found"
-            exit 1
-          fi
           echo "Using Xcode: $XCODE_26"
           sudo xcode-select -s "$XCODE_26/Contents/Developer"
           xcodebuild -version
 
-          # Убираем только treatAllWarnings (оставляем остальные strict-настройки)
+          # Только убираем treatAllWarnings
           sed -i '' '/treatAllWarnings/d' Package.swift
 
-          # Генерируем Xcode-проект
           xtool dev generate-xcode-project
 
-          # Собираем unsigned device-сборку
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
             -scheme FactoriOS-App \
