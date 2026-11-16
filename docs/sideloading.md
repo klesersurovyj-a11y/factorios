@@ -21,9 +21,22 @@ in the repository as the Actions secret `FACTORIO_URL`, which the workflow prefe
 
 The IPA is unsigned: iOS installs only code signed with your Apple Account, so a signing tool signs it while installing.
 
-- [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) on a computer with a free Apple Account.
-- On the device, turn on Settings → Privacy & Security → **Developer Mode**, then trust your account under Settings →
-  General → VPN & Device Management.
+[Feather](https://github.com/claration/feather) does that on the phone itself, but it signs only with a certificate you
+import: a `.p12` and its `.mobileprovision`, listing your device and matching the bundle ID `app.factorios` (a wildcard
+profile works). Feather can't create them from an Apple ID.
+
+1. Download the run's artifact zip in Safari and unzip it in Files; it holds `FactoriOS-sideload.ipa`.
+2. Open that IPA in Feather, or **Library** → **+** → **Import from Files**.
+3. Import the `.p12` and `.mobileprovision` under **Certificates**, then **Sign** and **Install**.
+4. Turn on Settings → Privacy & Security → **Developer Mode**, and trust the certificate under Settings → General →
+   VPN & Device Management.
+
+Feather unpacks and re-signs the app on the phone and hashes the game data, so it wants about three times the IPA's
+size free. If installing from its local server stays on *Ready*, pick **Settings** → **Installation** → **Server** →
+**Semi Local**.
+
+Otherwise [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) on a computer, with a free Apple
+Account.
 
 A free account's signature lasts 7 days; install again after that. Saves stay.
 

@@ -118,11 +118,33 @@ jobs:
           cp "$game/Converted/slots.json" "$app/Frameworks/factorio.slots.json"
           chmod 755 "$app/Frameworks/factorio.dylib"
 
+          # zsign, which Feather signs with on the device, refuses an app without these keys. Xcode fills them in;
+          # insert them here rather than fail when it didn't.
+          plist="$app/Info.plist"
+          add_key() {
+            plutil -extract "$1" raw -o - "$plist" >/dev/null 2>&1 ||
+              plutil -insert "$1" -string "$2" "$plist"
+          }
+          add_key CFBundleExecutable "$(basename "$app" .app)"
+          add_key CFBundleIdentifier app.factorios
+          add_key CFBundleName FactoriOS
+          add_key CFBundlePackageType APPL
+          add_key CFBundleVersion 1
+          add_key CFBundleShortVersionString 1.0
+
           # Signed before the game data goes in: the data is not code, and the signing tool signs the app again.
           codesign --force --deep --sign - "$app"
 
           rm -rf "$app/Game"
           cp -R "$game/Game" "$app/Game"
+
+          # The game only reads Contents/data; the macOS executable and the bundle around it are dead weight in an IPA,
+          # and a signing tool on the device would try to sign the Mach-O inside it. An empty file keeps the path the
+          # game derives its data folder from, without the 200 MB binary.
+          rm -rf "$app/Game/factorio.app/Contents/MacOS" "$app/Game/factorio.app/Contents/_CodeSignature"
+          rm -f "$app/Game/factorio.app/Contents/Info.plist"
+          mkdir -p "$app/Game/factorio.app/Contents/MacOS"
+          : > "$app/Game/factorio.app/Contents/MacOS/factorio"
 
           mkdir -p Payload
           cp -R "$app" Payload/
