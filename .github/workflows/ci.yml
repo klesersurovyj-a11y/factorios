@@ -40,19 +40,25 @@ jobs:
 
       - name: Build unsigned FactoriOS app
         run: |
-          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
-          sudo xcode-select -s "$XCODE_26/Contents/Developer"
-          sed -i '' '/treatAllWarnings/d' Package.swift
-          python3 -c '
-          p1 = "Sources/FactoriOSRuntime/Game/AppEntry.swift"
-          s1 = open(p1).read().replace("FOSSDLRunApp(CommandLine.argc, CommandLine.unsafeArgv) { _, _ in", "FOSSDLRunApp(CommandLine.argc, CommandLine.unsafeArgv) { (_: Int32, _: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?) -> Int32 in")
-          open(p1, "w").write(s1)
+          set -euo pipefail
 
-          p2 = "Sources/FactoriOSRuntime/Game/GameSession.swift"
-          s2 = open(p2).read().replace("FOSCompatSetRestartHandler { arguments in", "FOSCompatSetRestartHandler { (arguments: UnsafePointer<CChar>?) -> Void in")
-          open(p2, "w").write(s2)
-          '
+          # Выбираем самый новый Xcode 26
+          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$XCODE_26" ]; then
+            echo "Xcode 26 not found"
+            exit 1
+          fi
+          echo "Using Xcode: $XCODE_26"
+          sudo xcode-select -s "$XCODE_26/Contents/Developer"
+          xcodebuild -version
+
+          # Убираем только treatAllWarnings (оставляем остальные strict-настройки)
+          sed -i '' '/treatAllWarnings/d' Package.swift
+
+          # Генерируем Xcode-проект
           xtool dev generate-xcode-project
+
+          # Собираем unsigned device-сборку
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
             -scheme FactoriOS-App \
