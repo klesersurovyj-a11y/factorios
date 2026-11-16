@@ -69,15 +69,21 @@ jobs:
           APP=$(find artifact xtool .build -name "FactoriOS-App.app" -type d | head -n 1)
           echo "Found app at: $APP"
 
-          DYLIB=$(find artifact -name "factorio.dylib" | head -n 1)
-          SLOTS=$(find artifact -name "slots.json" -o -name "factorio.slots.json" | head -n 1)
+          # Точные пути, которые создаёт prepare
+          GAME_ROOT="artifact/game/FactoriOS"
+          DYLIB="$GAME_ROOT/Converted/factorio.dylib"
+          SLOTS="$GAME_ROOT/Converted/slots.json"
+          GAME_DIR="$GAME_ROOT/Game"
 
-          echo "Found dylib: $DYLIB"
-          echo "Found slots: $SLOTS"
+          echo "Checking expected files:"
+          ls -la "$DYLIB" || echo "DYLIB missing"
+          ls -la "$SLOTS" || echo "SLOTS missing"
+          ls -la "$GAME_DIR" || echo "GAME_DIR missing"
 
-          if [ -z "$DYLIB" ] || [ -z "$SLOTS" ]; then
-            echo "ERROR: missing game files"
-            find artifact -type f \( -name "*.dylib" -o -name "*slots*" -o -name "*.json" \) | head -30
+          if [ ! -f "$DYLIB" ] || [ ! -f "$SLOTS" ]; then
+            echo "ERROR: expected files not found"
+            echo "Contents of artifact/game:"
+            find artifact/game -type f | head -50
             exit 1
           fi
 
@@ -86,17 +92,19 @@ jobs:
           cp "$SLOTS" "$APP/Frameworks/factorio.slots.json"
           chmod 755 "$APP/Frameworks/factorio.dylib"
 
-          GAME_DIR=$(find artifact -type d -path "*/Game" | head -n 1)
-          if [ -n "$GAME_DIR" ]; then
-            echo "Copying Game data from $GAME_DIR"
+          if [ -d "$GAME_DIR" ]; then
+            echo "Copying Game data"
             cp -R "$GAME_DIR" "$APP/Game"
           fi
+
+          echo "--- Frameworks after copy ---"
+          ls -la "$APP/Frameworks/"
 
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -r FactoriOS-unsigned.ipa Payload
 
-          echo "IPA created"
+          echo "IPA created successfully"
           ls -lh FactoriOS-unsigned.ipa
 
       - name: Create Release
