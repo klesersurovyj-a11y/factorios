@@ -40,11 +40,12 @@ jobs:
 
       - name: Build unsigned FactoriOS app
         run: |
-          XCODE_SEL=$(ls -d /Applications/Xcode_26.[0-4]*.app /Applications/Xcode_26*.app 2>/dev/null | head -n 1)
-          echo "Using Xcode: $XCODE_SEL"
-          sudo xcode-select -s "$XCODE_SEL/Contents/Developer"
+          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          echo "Using Xcode: $XCODE_26"
+          sudo xcode-select -s "$XCODE_26/Contents/Developer"
           sed -i '' '/treatAllWarnings/d' Package.swift
           xtool dev generate-xcode-project
+          set -o pipefail
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
             -scheme FactoriOS-App \
@@ -58,7 +59,7 @@ jobs:
             SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             SWIFT_STRICT_CONCURRENCY=minimal \
-            build
+            build | grep -C 4 "FOSCompatSetRestartHandler"
 
       - name: Embed game and package IPA
         run: |
