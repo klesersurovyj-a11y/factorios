@@ -118,10 +118,11 @@ final class GameSession {
         FOSCompatSetFrameRateCap(settings.frameRate.rawValue)
         let logPaths = paths
         FOSCompatSetRestartHandler { arguments in
-            MainActor.assumeIsolated {
-                RestartPrompt.show(arguments: arguments, paths: logPaths)
-            }
-        }
+    MainActor.assumeIsolated {
+        RestartPrompt.show(arguments: arguments, paths: logPaths)
+    }
+    // RestartPrompt.show never returns, but the handler type expects Void
+}
     }
 
     /// Sends the game's stdout and stderr to `game.log` in the logs folder.
