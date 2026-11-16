@@ -69,46 +69,45 @@ jobs:
           APP=$(find artifact xtool .build -name "FactoriOS-App.app" -type d | head -n 1)
           echo "Found app at: $APP"
 
-          # Ищем factorio.dylib и slots.json в разных возможных местах
+          # Ищем dylib и slots
           DYLIB=$(find artifact -name "factorio.dylib" | head -n 1)
-          SLOTS=$(find artifact -name "factorio.slots.json" | head -n 1)
-          GAME_DIR=$(find artifact -type d -name "Game" | head -n 1)
+          SLOTS=$(find artifact -name "slots.json" -o -name "factorio.slots.json" | head -n 1)
 
           echo "Found dylib: $DYLIB"
           echo "Found slots: $SLOTS"
-          echo "Found Game dir: $GAME_DIR"
 
-          if [ -z "$DYLIB" ]; then
-            echo "ERROR: factorio.dylib not found"
-            find artifact -type f | head -50
+          if [ -z "$DYLIB" ] || [ -z "$SLOTS" ]; then
+            echo "ERROR: missing game files"
+            find artifact -type f \( -name "*.dylib" -o -name "*slots*" -o -name "*.json" \) | head -30
             exit 1
           fi
 
           mkdir -p "$APP/Frameworks"
           cp "$DYLIB" "$APP/Frameworks/factorio.dylib"
+          cp "$SLOTS" "$APP/Frameworks/factorio.slots.json"
           chmod 755 "$APP/Frameworks/factorio.dylib"
 
-          if [ -n "$SLOTS" ]; then
-            cp "$SLOTS" "$APP/Frameworks/factorio.slots.json"
-          else
-            echo "WARNING: factorio.slots.json not found, continuing without it"
-          fi
-
+          # Копируем данные игры, если есть
+          GAME_DIR=$(find artifact -type d -path "*/Game" | head -n 1)
           if [ -n "$GAME_DIR" ]; then
+            echo "Copying Game data from $GAME_DIR"
             cp -R "$GAME_DIR" "$APP/Game"
-          else
-            echo "WARNING: Game directory not found"
           fi
 
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -r FactoriOS-unsigned.ipa Payload
 
-          echo "IPA created successfully"
+          echo "IPA created"
           ls -lh FactoriOS-unsigned.ipa
+          echo "--- Contents of Frameworks ---"
+          ls -la "$APP/Frameworks/" || true
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FactoriOS-IPA
           path: FactoriOS-unsigned.ipa
+          set -euo pipefail
+          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
+          echo "Using
