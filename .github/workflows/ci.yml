@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -69,7 +69,6 @@ jobs:
           APP=$(find artifact xtool .build -name "FactoriOS-App.app" -type d | head -n 1)
           echo "Found app at: $APP"
 
-          # Ищем dylib и slots
           DYLIB=$(find artifact -name "factorio.dylib" | head -n 1)
           SLOTS=$(find artifact -name "slots.json" -o -name "factorio.slots.json" | head -n 1)
 
@@ -87,7 +86,6 @@ jobs:
           cp "$SLOTS" "$APP/Frameworks/factorio.slots.json"
           chmod 755 "$APP/Frameworks/factorio.dylib"
 
-          # Копируем данные игры, если есть
           GAME_DIR=$(find artifact -type d -path "*/Game" | head -n 1)
           if [ -n "$GAME_DIR" ]; then
             echo "Copying Game data from $GAME_DIR"
@@ -100,11 +98,27 @@ jobs:
 
           echo "IPA created"
           ls -lh FactoriOS-unsigned.ipa
-          echo "--- Contents of Frameworks ---"
-          ls -la "$APP/Frameworks/" || true
 
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: FactoriOS-IPA
-          path: FactoriOS-unsigned.ipa
+          tag_name: build-${{ github.run_number }}
+          release_name: FactoriOS IPA #${{ github.run_number }}
+          draft: false
+          prerelease: true
+          body: |
+            Unsigned IPA for Feather / sideloading.
+            Built from commit ${{ github.sha }}
+
+      - name: Upload IPA to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: FactoriOS-unsigned.ipa
+          asset_name: FactoriOS-unsigned.ipa
+          asset_content_type: application/octet-stream
