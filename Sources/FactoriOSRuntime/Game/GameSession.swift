@@ -113,16 +113,16 @@ final class GameSession {
     }
 
     private func configureCompat(_ settings: GameSettings) {
-    FOSCompatSetExecutablePath(paths.gameExecutable.path)
-    FOSCompatInstallMetalFixes()
-    FOSCompatSetFrameRateCap(settings.frameRate.rawValue)
-    let logPaths = paths
-    FOSCompatSetRestartHandler { arguments in
-        MainActor.assumeIsolated {
-            RestartPrompt.show(arguments: arguments, paths: logPaths)
+        FOSCompatSetExecutablePath(paths.gameExecutable.path)
+        FOSCompatInstallMetalFixes()
+        FOSCompatSetFrameRateCap(settings.frameRate.rawValue)
+        let logPaths = paths
+        FOSCompatSetRestartHandler { arguments in
+            MainActor.assumeIsolated {
+                RestartPrompt.show(arguments: arguments, paths: logPaths)
+            }
         }
     }
-}
 
     /// Sends the game's stdout and stderr to `game.log` in the logs folder.
     private func redirectOutput() throws {
