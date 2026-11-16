@@ -125,7 +125,14 @@ jobs:
             plutil -extract "$1" raw -o - "$plist" >/dev/null 2>&1 ||
               plutil -insert "$1" -string "$2" "$plist"
           }
-          add_key CFBundleExecutable "$(basename "$app" .app)"
+          # The executable is whatever Mach-O sits at the app's root; its name needn't match the bundle's.
+          executable=$(cd "$app" && for candidate in *; do
+            if file "$candidate" | grep -q 'Mach-O'; then
+              printf '%s' "$candidate"
+              break
+            fi
+          done)
+          add_key CFBundleExecutable "${executable:-$(basename "$app" .app)}"
           add_key CFBundleIdentifier app.factorios
           add_key CFBundleName FactoriOS
           add_key CFBundlePackageType APPL
