@@ -33,11 +33,12 @@ enum AppEntry {
             exit(EXIT_FAILURE)
         }
         let status = FOSSDLRunApp(CommandLine.argc, CommandLine.unsafeArgv) { _, _ in
-            MainActor.assumeIsolated {
-                Self.sdlMain()
-            }
-        }
-        exit(status)
+    MainActor.assumeIsolated {
+        Self.sdlMain()
+    }
+    return 0
+}
+exit(status)
     }
 
     /// SDL's main callback, on the main thread with UIKit running: the launcher until the player starts the game.
