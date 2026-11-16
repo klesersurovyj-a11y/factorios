@@ -1,8 +1,8 @@
 name: CI
 
 on:
+  # Every branch, so pushing one gives you an IPA to try.
   push:
-    branches: [master]
   pull_request:
   workflow_dispatch:
     inputs:

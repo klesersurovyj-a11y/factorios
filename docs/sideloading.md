@@ -10,7 +10,7 @@ fresh install goes straight to Home.
 
 ## Build it
 
-1. **Actions** → **CI** → **Run workflow**, or push to `master`.
+1. Push a branch (any branch builds one), or **Actions** → **CI** → **Run workflow**.
 2. Leave `factorio_url` empty for the free demo, or give a Factorio for macOS `.dmg` link.
 3. Download `FactoriOS-ipa-<run number>` from the run's **Artifacts**.
 
