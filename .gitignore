@@ -12,5 +12,8 @@ mise.local.toml
 /artifact/
 *.dmg
 
+# A packaged app, which contains the game
+*.ipa
+
 # macOS
 .DS_Store

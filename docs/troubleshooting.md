@@ -12,6 +12,8 @@
 | *Untrusted Developer* | Settings → General → VPN & Device Management → your account → Trust |
 | App stopped opening after a week | Free profile expired: `mise run deploy` |
 | Welcome screen instead of home | Game data missing: run `deploy` (or `simulator:build`) again |
+| Welcome screen after sideloading | The IPA was built without the game: rerun CI, which embeds the demo |
+| CI download fails | The link expired: set `FACTORIO_URL` (secret or workflow input) to a current download |
 | Game closes while loading | Out of memory: Sprite quality Medium, Light graphics on |
 | No simulator window | `mise run simulator:launch` opens Device Hub (Simulator.app before Xcode 27) |
 

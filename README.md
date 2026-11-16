@@ -19,13 +19,16 @@ mise install       # pinned toolchain
 mise run deploy    # builds, signs, installs and launches FactoriOS with the game
 ```
 
-[Getting started](docs/getting-started.md) walks through each step, including Xcode and device preparation.
+[Getting started](docs/getting-started.md) walks through each step, including Xcode and device preparation. No Mac?
+[Sideloading](docs/sideloading.md) has GitHub Actions build the app with the demo game inside, as an IPA for a
+sideloading tool.
 
 ## Documentation
 
 | Guide | For |
 |---|---|
 | [Getting started](docs/getting-started.md) | Building and installing on your device, step by step |
+| [Sideloading](docs/sideloading.md) | Installing a CI-built IPA without a Mac |
 | [Playing](docs/playing.md) | Launcher, settings, touch controls, saves and logs |
 | [Troubleshooting](docs/troubleshooting.md) | Signing, install and game launch problems |
 | [Development](docs/development.md) | Tasks, checks, CI, simulator, on-device debugging, new game versions |

@@ -69,6 +69,8 @@ sequenceDiagram
   symbol.
 - **Background:** `nextDrawable` waits while the app is in the background, where iOS forbids GPU work.
 - **Paths:** `read-data` is the imported game, `write-data` is `Documents/Factorio` (visible in Files).
+- **Game in the bundle:** a sideloaded build carries `Game/` in the app bundle, which iOS keeps read-only;
+  `GamePaths.gameRoot` uses it when Application Support holds no imported game.
 
 ## Compatibility map
 

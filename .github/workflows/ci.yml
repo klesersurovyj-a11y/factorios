@@ -1,18 +1,29 @@
-name: Build FactoriOS IPA
+name: CI
 
 on:
   push:
     branches: [master]
+  pull_request:
   workflow_dispatch:
+    inputs:
+      factorio_url:
+        description: Factorio for macOS .dmg to build in; empty uses the public demo
+        required: false
+        default: ""
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build IPA
-    runs-on: macos-26
-    timeout-minutes: 45
+  check:
+    name: Lint
+    # macOS: clang-tidy and the iOS build need Xcode.
+    runs-on: macos-15
+    timeout-minutes: 30
 
     steps:
       - name: Check out source
@@ -25,27 +36,60 @@ jobs:
         uses: jdx/mise-action@v3
         with:
           cache: true
-          install: true
+          install: false
 
-      - name: Download Factorio DMG
+      - name: Trust and install the toolchain
+        run: |
+          mise trust
+          mise install
+
+      - name: Lint
+        run: mise run lint
+
+  ipa:
+    name: Sideloadable IPA
+    # What deploy does on a Mac, in one app: the game, converted, inside the bundle (docs/sideloading.md).
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 120
+
+    env:
+      # The demo is public; a secret keeps your own copy's link out of the log.
+      FACTORIO_URL: ${{ secrets.FACTORIO_URL || github.event.inputs.factorio_url || 'https://factorio.com/get-download/2.1.23/demo/osx' }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install pinned tools
+        uses: jdx/mise-action@v3
+        with:
+          cache: true
+          install: false
+
+      - name: Trust and install the toolchain
+        run: |
+          mise trust
+          mise install
+          xcodebuild -version
+
+      - name: Download Factorio
         run: |
           mkdir -p artifact
-          curl -L "https://factorio.com/get-download/2.1.23/demo/osx" -o artifact/factorio_mac.dmg
+          curl -fL --retry 3 --retry-delay 5 "$FACTORIO_URL" -o artifact/factorio_mac.dmg
           file artifact/factorio_mac.dmg
+          du -h artifact/factorio_mac.dmg
 
-      - name: Build SDL3 and prepare game
+      - name: Build SDL3, import the game and convert it
         run: |
           mise run sdl3
           mise-tasks/prepare device
 
-      - name: Build unsigned FactoriOS app
+      - name: Build the app
         run: |
-          set -euo pipefail
-          XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
-          echo "Using Xcode: $XCODE_26"
-          sudo xcode-select -s "$XCODE_26/Contents/Developer"
-          xcodebuild -version
-          sed -i '' '/treatAllWarnings/d' Package.swift
           xtool dev generate-xcode-project
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
@@ -54,79 +98,42 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath artifact/DerivedData \
-            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
-            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             build
 
-      - name: Embed game and package IPA
+      - name: Embed the game and package the IPA
         run: |
-          set -euo pipefail
-
-          APP=$(find artifact xtool .build -name "FactoriOS-App.app" -type d | head -n 1)
-          echo "Found app at: $APP"
-
-          # Точные пути, которые создаёт prepare
-          GAME_ROOT="artifact/game/FactoriOS"
-          DYLIB="$GAME_ROOT/Converted/factorio.dylib"
-          SLOTS="$GAME_ROOT/Converted/slots.json"
-          GAME_DIR="$GAME_ROOT/Game"
-
-          echo "Checking expected files:"
-          ls -la "$DYLIB" || echo "DYLIB missing"
-          ls -la "$SLOTS" || echo "SLOTS missing"
-          ls -la "$GAME_DIR" || echo "GAME_DIR missing"
-
-          if [ ! -f "$DYLIB" ] || [ ! -f "$SLOTS" ]; then
-            echo "ERROR: expected files not found"
-            echo "Contents of artifact/game:"
-            find artifact/game -type f | head -50
+          set -eu
+          app=artifact/DerivedData/Build/Products/Release-iphoneos/FactoriOS-App.app
+          game=artifact/game/FactoriOS
+          if [ ! -d "$app" ]; then
+            echo "no app at $app; what the build made:"
+            find artifact/DerivedData -maxdepth 8 -name '*.app'
             exit 1
           fi
 
-          mkdir -p "$APP/Frameworks"
-          cp "$DYLIB" "$APP/Frameworks/factorio.dylib"
-          cp "$SLOTS" "$APP/Frameworks/factorio.slots.json"
-          chmod 755 "$APP/Frameworks/factorio.dylib"
+          mkdir -p "$app/Frameworks"
+          cp "$game/Converted/factorio.dylib" "$app/Frameworks/factorio.dylib"
+          cp "$game/Converted/slots.json" "$app/Frameworks/factorio.slots.json"
+          chmod 755 "$app/Frameworks/factorio.dylib"
 
-          if [ -d "$GAME_DIR" ]; then
-            echo "Copying Game data"
-            cp -R "$GAME_DIR" "$APP/Game"
-          fi
+          # Signed before the game data goes in: the data is not code, and the signing tool signs the app again.
+          codesign --force --deep --sign - "$app"
 
-          echo "--- Frameworks after copy ---"
-          ls -la "$APP/Frameworks/"
+          rm -rf "$app/Game"
+          cp -R "$game/Game" "$app/Game"
 
           mkdir -p Payload
-          cp -R "$APP" Payload/
-          zip -r FactoriOS-unsigned.ipa Payload
+          cp -R "$app" Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload FactoriOS-sideload.ipa
+          du -h FactoriOS-sideload.ipa
+          plutil -extract version raw -o - "$app/Game/game.json"
 
-          echo "IPA created successfully"
-          ls -lh FactoriOS-unsigned.ipa
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload the IPA
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: build-${{ github.run_number }}
-          release_name: FactoriOS IPA #${{ github.run_number }}
-          draft: false
-          prerelease: true
-          body: |
-            Unsigned IPA for Feather / sideloading.
-            Built from commit ${{ github.sha }}
-
-      - name: Upload IPA to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: FactoriOS-unsigned.ipa
-          asset_name: FactoriOS-unsigned.ipa
-          asset_content_type: application/octet-stream
+          name: FactoriOS-ipa-${{ github.run_number }}
+          path: FactoriOS-sideload.ipa
+          if-no-files-found: error
+          retention-days: 7

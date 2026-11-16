@@ -14,6 +14,7 @@ mise run simulator:launch  # relaunch the installed simulator app
 ```
 
 - Run `lint` and `build` before a pull request; CI runs both.
+- CI also builds a sideloadable IPA with the game inside it: see [Sideloading](sideloading.md).
 - `deploy` and `simulator:build` both run [`prepare`](../mise-tasks/prepare) (import `.dmg`, convert) and regenerate
   `xtool/`.
 - The game doesn't start on its own: tap **Main menu**.

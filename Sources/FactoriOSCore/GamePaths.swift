@@ -40,14 +40,35 @@ public struct GamePaths: Sendable, Equatable {
         )
     }
 
+    /// The game: `Game` in Application Support, or the one a sideloaded build carries inside its app bundle.
+    ///
+    /// `deploy` puts the imported game in Application Support. A build made by the CI workflow embeds the same folder
+    /// in the app instead, which iOS keeps read-only, so the app uses it when Application Support has no game.
+    public var gameRoot: URL {
+        let imported = support.appendingPathComponent("Game", isDirectory: true)
+        if FileManager.default.fileExists(atPath: imported.appendingPathComponent("game.json").path) {
+            return imported
+        }
+        return bundledGameRoot ?? imported
+    }
+
+    /// The `Game` folder a sideloaded build carries in its app bundle, or `nil` when it carries none.
+    public var bundledGameRoot: URL? {
+        guard let root = bundle?.appendingPathComponent("Game", isDirectory: true) else {
+            return nil
+        }
+        let record = root.appendingPathComponent("game.json")
+        return FileManager.default.fileExists(atPath: record.path) ? root : nil
+    }
+
     /// The imported `factorio.app`.
-    public var gameApp: URL { support.appendingPathComponent("Game/factorio.app", isDirectory: true) }
+    public var gameApp: URL { gameRoot.appendingPathComponent("factorio.app", isDirectory: true) }
     /// The game's read-only data directory (`read-data`).
     public var gameData: URL { gameApp.appendingPathComponent("Contents/data", isDirectory: true) }
     /// The game's original macOS executable.
     public var gameExecutable: URL { gameApp.appendingPathComponent("Contents/MacOS/factorio") }
     /// Facts about the imported game, written by `deploy`.
-    public var gameInfo: URL { support.appendingPathComponent("Game/game.json") }
+    public var gameInfo: URL { gameRoot.appendingPathComponent("game.json") }
 
     /// The converted, signed game library that FactoriOS loads from the app bundle.
     ///
