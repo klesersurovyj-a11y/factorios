@@ -51,18 +51,20 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath artifact/DerivedData \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             SWIFT_COMPILATION_MODE=singlefile \
             SWIFT_OPTIMIZATION_LEVEL=-Onone \
-            build
+            build || xtool dev build --configuration release
 
       - name: Embed game and package IPA
         run: |
-          APP="artifact/DerivedData/Build/Products/Release-iphoneos/FactoriOS-App.app"
+          APP=$(find artifact xtool .build -name "FactoriOS-App.app" -type d | head -n 1)
+          echo "Found app at: $APP"
           GAME="artifact/game/FactoriOS"
           mkdir -p "$APP/Frameworks"
           cp "$GAME/Converted/factorio.dylib" "$APP/Frameworks/factorio.dylib"
