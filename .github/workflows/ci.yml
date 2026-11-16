@@ -41,17 +41,12 @@ jobs:
       - name: Build unsigned FactoriOS app
         run: |
           set -euo pipefail
-
           XCODE_26=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1)
           echo "Using Xcode: $XCODE_26"
           sudo xcode-select -s "$XCODE_26/Contents/Developer"
           xcodebuild -version
-
-          # Только убираем treatAllWarnings
           sed -i '' '/treatAllWarnings/d' Package.swift
-
           xtool dev generate-xcode-project
-
           xcodebuild \
             -workspace xtool/FactoriOS.xcworkspace \
             -scheme FactoriOS-App \
@@ -69,21 +64,51 @@ jobs:
 
       - name: Embed game and package IPA
         run: |
+          set -euo pipefail
+
           APP=$(find artifact xtool .build -name "FactoriOS-App.app" -type d | head -n 1)
           echo "Found app at: $APP"
-          GAME="artifact/game/FactoriOS"
+
+          # Ищем factorio.dylib и slots.json в разных возможных местах
+          DYLIB=$(find artifact -name "factorio.dylib" | head -n 1)
+          SLOTS=$(find artifact -name "factorio.slots.json" | head -n 1)
+          GAME_DIR=$(find artifact -type d -name "Game" | head -n 1)
+
+          echo "Found dylib: $DYLIB"
+          echo "Found slots: $SLOTS"
+          echo "Found Game dir: $GAME_DIR"
+
+          if [ -z "$DYLIB" ]; then
+            echo "ERROR: factorio.dylib not found"
+            find artifact -type f | head -50
+            exit 1
+          fi
+
           mkdir -p "$APP/Frameworks"
-          cp "$GAME/Converted/factorio.dylib" "$APP/Frameworks/factorio.dylib"
-          cp "$GAME/Converted/factorio.slots.json" "$APP/Frameworks/factorio.slots.json"
+          cp "$DYLIB" "$APP/Frameworks/factorio.dylib"
           chmod 755 "$APP/Frameworks/factorio.dylib"
-          cp -R "$GAME/Game" "$APP/Game"
+
+          if [ -n "$SLOTS" ]; then
+            cp "$SLOTS" "$APP/Frameworks/factorio.slots.json"
+          else
+            echo "WARNING: factorio.slots.json not found, continuing without it"
+          fi
+
+          if [ -n "$GAME_DIR" ]; then
+            cp -R "$GAME_DIR" "$APP/Game"
+          else
+            echo "WARNING: Game directory not found"
+          fi
+
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -r FactoriOS-unsigned.ipa Payload
+
+          echo "IPA created successfully"
+          ls -lh FactoriOS-unsigned.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FactoriOS-IPA
           path: FactoriOS-unsigned.ipa
-
