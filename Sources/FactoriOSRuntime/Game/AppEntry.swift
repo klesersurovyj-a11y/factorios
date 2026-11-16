@@ -25,21 +25,22 @@ enum AppEntry {
     /// In SDL's main: the launcher window, then the game. Never returns (the game's static state can't be run twice;
     /// when it ends, the app exits).
     @MainActor
-    static func main() {
-        var error: NSError?
-        guard FOSSDLLoad(sdlLibrary.path, &error) else {
-            // Without SDL there is no UIApplication yet to show anything in.
-            RuntimeLog.write("Can't load SDL3: \(error?.localizedDescription ?? "unknown error")", paths: nil)
-            exit(EXIT_FAILURE)
+    @MainActor
+static func main() {
+    var error: NSError?
+    guard FOSSDLLoad(sdlLibrary.path, &error) else {
+        RuntimeLog.write("Can't load SDL3: \(error?.localizedDescription ?? "unknown error")", paths: nil)
+        exit(EXIT_FAILURE)
+    }
+
+    let status = FOSSDLRunApp(CommandLine.argc, CommandLine.unsafeArgv) { _, _ in
+        MainActor.assumeIsolated {
+            Self.sdlMain()
         }
-        let status = FOSSDLRunApp(CommandLine.argc, CommandLine.unsafeArgv) { _, _ in
-    MainActor.assumeIsolated {
-        Self.sdlMain()
+        return 0
     }
-    return 0
+    exit(status)
 }
-exit(status)
-    }
 
     /// SDL's main callback, on the main thread with UIKit running: the launcher until the player starts the game.
     @MainActor
